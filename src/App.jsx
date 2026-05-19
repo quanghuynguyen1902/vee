@@ -2,6 +2,14 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import './index.css';
 import { getCustomTopics, saveCustomTopic, deleteCustomTopic, getTopic } from './utils/storage';
 import { generateFromMeetings } from './utils/ai';
+import {
+  loadTopicProgress,
+  saveTopicProgress,
+  markTopicStarted,
+  markTopicCompleted,
+  updateTopicSession,
+  clearTopicProgress
+} from './utils/progress';
 import TopicsScreen from './components/TopicsScreen';
 import CreateTopicScreen from './components/CreateTopicScreen';
 import PlayScreen from './components/PlayScreen';
@@ -24,6 +32,7 @@ export default function App() {
   const [currentTopic, setCurrentTopic] = useState(null);
   const [results, setResults] = useState([]);
   const [customTopics, setCustomTopics] = useState([]);
+  const [topicProgress, setTopicProgress] = useState(() => loadTopicProgress());
   const [showImport, setShowImport] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showDBViewer, setShowDBViewer] = useState(false);
@@ -47,6 +56,10 @@ export default function App() {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    saveTopicProgress(topicProgress);
+  }, [topicProgress]);
 
   const allTopics = useMemo(() => {
     return customTopics.map((t) => ({ ...t, isBuiltIn: false }));
@@ -77,14 +90,46 @@ export default function App() {
       setCurrentTopic(fullTopic);
       setResults([]);
       setScreen(SCREENS.PLAY);
+      setTopicProgress((prev) =>
+        markTopicStarted(
+          prev,
+          fullTopic.id,
+          currentMode,
+          fullTopic.sentences?.length || topic.sentence_count || 0
+        )
+      );
     },
-    [allTopics]
+    [allTopics, currentMode]
   );
 
   const handleComplete = useCallback((finalResults) => {
     setResults(finalResults);
     setScreen(SCREENS.RESULT);
-  }, []);
+
+    if (!currentTopic) return;
+    const total = finalResults.length;
+    const correct = finalResults.filter((r) => r.correct).length;
+    const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    setTopicProgress((prev) =>
+      markTopicCompleted(prev, currentTopic.id, {
+        score,
+        mode: currentMode,
+        totalQuestions: currentTopic.sentences?.length || total
+      })
+    );
+  }, [currentMode, currentTopic]);
+
+  const handlePlayProgress = useCallback((sessionState) => {
+    if (!currentTopic) return;
+    setTopicProgress((prev) =>
+      updateTopicSession(prev, currentTopic.id, {
+        mode: currentMode,
+        totalQuestions: currentTopic.sentences?.length || 0,
+        session: sessionState
+      })
+    );
+  }, [currentMode, currentTopic]);
 
   const handleSaveCustom = useCallback(async (topic) => {
     await saveCustomTopic(topic);
@@ -97,6 +142,7 @@ export default function App() {
       if (!confirm('Xóa chủ đề này?')) return;
       await deleteCustomTopic(id);
       setCustomTopics((prev) => prev.filter((t) => t.id !== id));
+      setTopicProgress((prev) => clearTopicProgress(prev, id));
     },
     []
   );
@@ -158,6 +204,7 @@ export default function App() {
       {screen === SCREENS.TOPICS && (
         <TopicsScreen
           topics={allTopics}
+          topicProgress={topicProgress}
           currentMode={currentMode}
           onSetMode={setCurrentMode}
           onStartTopic={startTopic}
@@ -187,6 +234,8 @@ export default function App() {
         <PlayScreen
           topic={currentTopic}
           mode={currentMode}
+          initialProgress={topicProgress?.[currentTopic.id]}
+          onProgress={handlePlayProgress}
           onBack={goTopics}
           onComplete={handleComplete}
         />

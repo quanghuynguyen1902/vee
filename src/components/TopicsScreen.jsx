@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { Upload, Sparkles, Trash2, Video, Database } from 'lucide-react';
 
 export default function TopicsScreen({
   topics,
+  topicProgress,
   currentMode,
   onSetMode,
   onStartTopic,
@@ -58,6 +58,16 @@ export default function TopicsScreen({
       <div className="topics-grid">
         {topics.map((t) => {
           const isCustom = !t.isBuiltIn;
+          const progress = topicProgress?.[t.id];
+          const totalQuestions = progress?.totalQuestions || (t.sentences?.length || t.sentence_count || 0);
+          const doneCount = progress?.session?.results?.length || 0;
+          const percent = totalQuestions > 0 ? Math.round((doneCount / totalQuestions) * 100) : 0;
+          const statusText = progress?.inProgress
+            ? `Đang làm dở: ${doneCount}/${totalQuestions} (${percent}%)`
+            : progress?.completed
+              ? `Lần gần nhất: ${progress.lastScore || 0}% · ${progress.attempts || 1} lượt`
+              : '';
+
           return (
             <div
               key={t.id}
@@ -69,6 +79,11 @@ export default function TopicsScreen({
               <div className="topic-meta">
                 {(t.sentences?.length || t.sentence_count || 0)} câu · {currentMode === 'drag' ? 'Lắp ghép từ' : 'Tự điền từ'}
               </div>
+              {statusText && (
+                <div className={`topic-status ${progress?.inProgress ? 'in-progress' : ''}`}>
+                  {statusText}
+                </div>
+              )}
               {isCustom && (
                 <button
                   className="delete-btn"

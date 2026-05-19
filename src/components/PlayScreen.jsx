@@ -1,13 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 
-const builtInDistractors = {
-  greetings: ['good', 'morning', 'fine'],
-  family: ['brother', 'her', 'his'],
-  food: ['water', 'eat', 'rice'],
-  travel: ['map', 'hotel', 'ticket'],
-  work: ['job', 'boss', 'office']
-};
-
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -20,6 +12,8 @@ function shuffle(arr) {
 export default function PlayScreen({
   topic,
   mode,
+  initialProgress,
+  onProgress,
   onBack,
   onComplete
 }) {
@@ -30,17 +24,89 @@ export default function PlayScreen({
   const [feedback, setFeedback] = useState('');
   const [feedbackClass, setFeedbackClass] = useState('');
   const [results, setResults] = useState([]);
+  const hasRestoredRef = useRef(false);
   const inputRefs = useRef([]);
 
   const sentence = topic.sentences[currentIndex];
   const isLast = currentIndex + 1 === topic.sentences.length;
 
   useEffect(() => {
-    setCurrentIndex(0);
-    setResults([]);
-    loadSentence(0);
+    hasRestoredRef.current = false;
+  }, [topic.id, mode]);
+
+  useEffect(() => {
+    if (hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
+
+    const saved = initialProgress?.session;
+    const canRestore = initialProgress?.inProgress && initialProgress?.lastMode === mode && saved;
+
+    if (canRestore) {
+      const total = topic.sentences.length;
+      const restoredIndex = Math.min(Math.max(saved.currentIndex || 0, 0), Math.max(total - 1, 0));
+      const s = topic.sentences[restoredIndex];
+      const restoredAnswers = Array.isArray(saved.userAnswers)
+        ? saved.userAnswers.slice(0, s.en.length)
+        : new Array(s.en.length).fill('');
+
+      while (restoredAnswers.length < s.en.length) restoredAnswers.push('');
+
+      setCurrentIndex(restoredIndex);
+      setResults(Array.isArray(saved.results) ? saved.results : []);
+      setChecked(!!saved.checked);
+      setFeedback(saved.feedback || '');
+      setFeedbackClass(saved.feedbackClass || '');
+      setUserAnswers(restoredAnswers);
+
+      if (mode === 'drag') {
+        if (Array.isArray(saved.bankWords) && saved.bankWords.length > 0) {
+          setBankWords(saved.bankWords);
+        } else {
+          const pool = shuffle([...s.en]);
+          setBankWords(pool.map((word, i) => ({ word, id: i, used: restoredAnswers.includes(word) })));
+        }
+      } else {
+        setBankWords([]);
+      }
+    } else {
+      setCurrentIndex(0);
+      setResults([]);
+      loadSentence(0);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic, mode]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  function pickVoice(langPrefix) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    return (
+      voices.find((v) => v.lang?.toLowerCase().startsWith(langPrefix)) ||
+      voices.find((v) => v.lang?.toLowerCase().startsWith('en')) ||
+      voices[0]
+    );
+  }
+
+  function speakText(text, langPrefix) {
+    if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = pickVoice(langPrefix);
+    if (voice) utterance.voice = voice;
+    utterance.lang = voice?.lang || (langPrefix === 'vi' ? 'vi-VN' : 'en-US');
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+  }
 
   function loadSentence(idx) {
     setChecked(false);
@@ -51,14 +117,7 @@ export default function PlayScreen({
     setUserAnswers(empty);
 
     if (mode === 'drag') {
-      const isBuiltIn = !!builtInDistractors[topic.id];
-      let extra = [];
-      if (isBuiltIn) {
-        extra = builtInDistractors[topic.id] || [];
-      } else {
-        extra = shuffle(['the', 'and', 'with', 'from', 'about', 'before', 'after', 'they', 'them', 'their', 'would', 'could', 'should']).slice(0, 3);
-      }
-      const pool = shuffle([...s.en, ...extra]);
+      const pool = shuffle([...s.en]);
       setBankWords(pool.map((word, i) => ({ word, id: i, used: false })));
     } else {
       setBankWords([]);
@@ -174,12 +233,7 @@ export default function PlayScreen({
 
   function nextSentence() {
     if (isLast) {
-      onComplete([...results, {
-        correct: feedbackClass === 'correct-text',
-        vi: sentence.vi,
-        enCorrect: sentence.en.join(' '),
-        enUser: userAnswers.join(' ')
-      }]);
+      onComplete(results);
     } else {
       const next = currentIndex + 1;
       setCurrentIndex(next);
@@ -187,13 +241,21 @@ export default function PlayScreen({
     }
   }
 
-  // Re-calc results for final when clicking next on last
   useEffect(() => {
-    if (isLast && checked && results.length === topic.sentences.length - 1) {
-      // pending final result will be added in nextSentence
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checked, currentIndex]);
+    const timer = setTimeout(() => {
+      onProgress?.({
+        currentIndex,
+        results,
+        checked,
+        feedback,
+        feedbackClass,
+        userAnswers,
+        bankWords
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [onProgress, currentIndex, results, checked, feedback, feedbackClass, userAnswers, bankWords]);
 
   return (
     <section className="screen active" id="screen-play">
@@ -218,6 +280,14 @@ export default function PlayScreen({
       <div className="spacer" />
 
       <div className="sentence-vi">{sentence.vi}</div>
+      <div className="sentence-audio-actions">
+        <button className="btn btn-sm" onClick={() => speakText(sentence.vi, 'vi')}>
+          🔊 Nghe câu Việt
+        </button>
+        <button className="btn btn-sm" onClick={() => speakText(sentence.en.join(' '), 'en')}>
+          🔊 Nghe câu Anh
+        </button>
+      </div>
 
       <div className="slots-area">
         {mode === 'drag'

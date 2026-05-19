@@ -215,6 +215,15 @@ html, body {
   letter-spacing: 0.08em;
 }
 
+.topic-card .topic-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.topic-card .topic-status.in-progress {
+  color: oklch(52% 0.12 85);
+}
+
 .topic-card .delete-btn {
   position: absolute;
   top: var(--space-2);
@@ -382,6 +391,14 @@ html, body {
   text-align: center;
   margin: var(--space-8) 0 var(--space-12);
   color: var(--fg);
+}
+
+.sentence-audio-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
 }
 
 .slots-area {

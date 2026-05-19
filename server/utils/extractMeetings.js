@@ -49,11 +49,16 @@ export async function extractRandomMeetingFiles(sampleSize = 15) {
       return { text: '', count: 0, files: [] };
     }
 
-    // Shuffle and pick random sample
-    const shuffled = docxFiles.sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle for better randomness
+    const shuffled = [...docxFiles];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const selected = shuffled.slice(0, Math.min(sampleSize, docxFiles.length));
 
     let allText = '';
+    const processedFiles = [];
     for (const file of selected) {
       const filePath = path.join(MEETING_DIR, file);
       try {
@@ -63,13 +68,14 @@ export async function extractRandomMeetingFiles(sampleSize = 15) {
           .trim();
         if (clean.length > 50) {
           allText += `\n\n--- ${file} ---\n\n${clean}`;
+          processedFiles.push(file);
         }
       } catch (err) {
         console.warn(`Skip ${file}:`, err.message);
       }
     }
 
-    return { text: allText.trim(), count: docxFiles.length, files: selected };
+    return { text: allText.trim(), count: docxFiles.length, files: processedFiles };
   } catch (err) {
     console.error('Error reading meetings:', err.message);
     return { text: '', count: 0, files: [] };
