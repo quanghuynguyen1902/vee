@@ -341,8 +341,8 @@ export default function PlayScreen({
               })}
         </div>
 
-        {mode === 'drag' && (
-          <>
+        {mode === 'drag' && !checked && (
+          <div className="word-bank-section">
             <div className="bank-label">Chọn từ để sắp xếp</div>
             <div className="word-bank">
               {bankWords.map((b) => (
@@ -355,7 +355,7 @@ export default function PlayScreen({
                 </div>
               ))}
             </div>
-          </>
+          </div>
         )}
 
         {mode === 'type' && (

@@ -506,7 +506,20 @@ html, body {
   letter-spacing: 0.12em;
   color: var(--muted);
   text-align: center;
-  margin-bottom: var(--space-4);
+  width: max-content;
+  margin: 0 auto;
+  padding: 0 var(--space-2);
+  background: var(--bg);
+  position: relative;
+  z-index: 3;
+}
+
+.word-bank-section {
+  margin-top: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .word-bank {
@@ -514,6 +527,7 @@ html, body {
   flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: center;
+  margin-top: 0;
   margin-bottom: var(--space-8);
 }
 
@@ -628,6 +642,7 @@ html, body {
   text-align: center;
   font-size: 0.8rem;
   color: var(--muted);
+  margin-top: var(--space-8);
   margin-bottom: var(--space-4);
 }
 
@@ -820,7 +835,7 @@ html, body {
 }
 
 .play-main .slots-area {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
 .play-main .play-actions {
