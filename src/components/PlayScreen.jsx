@@ -309,32 +309,36 @@ export default function PlayScreen({
                   {ans}
                 </div>
               ))
-            : userAnswers.map((ans, i) => (
-                <input
-                  key={i}
-                  ref={(el) => (inputRefs.current[i] = el)}
-                  type="text"
-                  className={`slot-input ${
-                    checked
-                      ? ans.toLowerCase() === sentence.en[i].toLowerCase()
-                        ? 'correct'
-                        : 'wrong'
-                      : ''
-                  }`}
-                  value={ans}
-                  onChange={(e) => onTypeInput(i, e.target.value)}
-                  readOnly={checked}
-                  autoComplete="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (allFilled) checkAnswer();
-                    }
-                  }}
-                />
-              ))}
+            : userAnswers.map((ans, i) => {
+                const statusClass = checked
+                  ? ans.toLowerCase() === sentence.en[i].toLowerCase()
+                    ? 'correct'
+                    : 'wrong'
+                  : '';
+                return checked ? (
+                  <div key={i} className={`slot-input ${statusClass}`}>
+                    {ans}
+                  </div>
+                ) : (
+                  <input
+                    key={i}
+                    ref={(el) => (inputRefs.current[i] = el)}
+                    type="text"
+                    className={`slot-input ${statusClass}`}
+                    value={ans}
+                    onChange={(e) => onTypeInput(i, e.target.value)}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (allFilled) checkAnswer();
+                      }
+                    }}
+                  />
+                );
+              })}
         </div>
 
         {mode === 'drag' && (

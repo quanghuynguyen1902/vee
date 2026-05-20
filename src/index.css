@@ -472,6 +472,9 @@ html, body {
   outline: none;
   padding: 0 var(--space-2);
   transition: border-color 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .slot-input:focus {
