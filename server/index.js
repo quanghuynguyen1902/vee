@@ -45,6 +45,14 @@ const generateLimiter = rateLimit({
   message: { error: 'Quá nhiều request, vui lòng thử lại sau 1 phút.' }
 });
 
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Quá nhiều tin nhắn, vui lòng thử lại sau 1 phút.' }
+});
+
 // ---- Admin auth middleware ----
 function requireAdmin(req, res, next) {
   const token = req.headers['x-admin-token'];
@@ -123,11 +131,11 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that creates English vocabulary exercises from Vietnamese text. For each Vietnamese sentence, provide the English translation broken down into individual words.'
+            content: 'You are a bilingual assistant creating English vocabulary exercises. Given Vietnamese text, produce natural-sounding Vietnamese sentences and accurate English translations. Break each English sentence into an array of meaningful tokens. Keep contractions as single tokens (e.g., "don\'t", "I\'m", "can\'t"). Keep proper nouns and multi-word terms as single tokens when they represent one semantic unit. The Vietnamese sentence should be natural, not a word-for-word translation.'
           },
           {
             role: 'user',
-            content: `Convert the following Vietnamese text into pairs of Vietnamese sentences and English word arrays. Return ONLY a JSON object with a "sentences" array: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}. Do not include markdown formatting or extra text.\n\n${text}`
+            content: `Convert the following Vietnamese text into pairs of Vietnamese sentences and English token arrays. Each English array should contain meaningful tokens in correct order. Keep contractions as single tokens (e.g., "don't", "I'm", "can't"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit (e.g., "New York", "machine learning"). The Vietnamese translation must be natural and accurate, not a literal word-for-word translation.\n\nReturn ONLY a JSON object with a "sentences" array: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}. Do not include markdown formatting or extra text.\n\n${text}`
           }
         ]
       })
@@ -180,19 +188,11 @@ app.post('/api/generate-from-meetings', generateLimiter, async (_req, res) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that creates English vocabulary exercises from meeting transcripts. Given meeting notes in English, create important sentences that summarize key discussion points, then translate them into Vietnamese. Break down the English translation into individual words for a word-arrangement exercise.'
+            content: 'You are a bilingual assistant creating English vocabulary exercises from meeting transcripts. Summarize key discussion points into natural English sentences, then translate them into accurate, natural Vietnamese. Break each English sentence into an array of meaningful tokens. Keep contractions as single tokens (e.g., "don\'t", "I\'m", "can\'t"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit (e.g., "New York", "machine learning"). The Vietnamese translation must convey the correct meaning, not be a literal word-for-word translation.'
           },
           {
             role: 'user',
-            content: `From the following meeting transcripts (extracted from ${files.length} different meeting files), create 20 diverse sentences covering different topics discussed. For each sentence:
-1. The Vietnamese translation
-2. The English sentence broken down into individual words (in correct order)
-
-Important: Each sentence should be from DIFFERENT parts of the meetings, not repetitive. Cover various topics like bugs, features, deadlines, team updates, technical discussions, etc.
-
-Return ONLY a JSON object: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}.
-
-Meeting transcripts:\n\n${text.substring(0, 50000)}`
+            content: `From the following meeting transcripts (extracted from ${files.length} different meeting files), create 20 diverse sentences covering different topics discussed. For each sentence:\n1. A natural Vietnamese translation that accurately conveys the meaning\n2. The English sentence broken down into meaningful tokens (in correct order). Keep contractions as single tokens (e.g., "don't", "I'm", "can't"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit.\n\nImportant: Each sentence should be from DIFFERENT parts of the meetings, not repetitive. Cover various topics like bugs, features, deadlines, team updates, technical discussions, etc. The Vietnamese translation must be natural, not a literal word-for-word translation.\n\nReturn ONLY a JSON object: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}.\n\nMeeting transcripts:\n\n${text.substring(0, 50000)}`
           }
         ]
       })
@@ -218,6 +218,53 @@ Meeting transcripts:\n\n${text.substring(0, 50000)}`
     });
   } catch (err) {
     console.error('Meeting generation error:', err);
+    return res.status(500).json({ error: err.message || 'Lỗi server' });
+  }
+});
+
+app.post('/api/chat', chatLimiter, async (req, res) => {
+  const { messages } = req.body;
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Server chưa cấu hình API key' });
+  }
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Vui lòng cung cấp tin nhắn' });
+  }
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': process.env.APP_URL || 'https://dichcau.app',
+        'X-Title': 'DichCau'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful bilingual English-Vietnamese tutor. Help the user learn English by explaining vocabulary, grammar, and sentence structure in Vietnamese. Keep answers concise and friendly.'
+          },
+          ...messages
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(502).json({ error: err.error?.message || `OpenRouter error: ${response.status}` });
+    }
+
+    const data = await response.json();
+    const reply = data.choices[0]?.message?.content || '';
+    return res.json({ reply });
+  } catch (err) {
+    console.error('Chat API error:', err);
     return res.status(500).json({ error: err.message || 'Lỗi server' });
   }
 });

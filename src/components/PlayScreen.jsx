@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { smartJoin } from '../utils/text';
+import ChatPanel from './ChatPanel';
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -188,8 +190,8 @@ export default function PlayScreen({
       {
         correct: allCorrect,
         vi: sentence.vi,
-        enCorrect: correctArr.join(' '),
-        enUser: userAnswers.join(' ')
+        enCorrect: smartJoin(correctArr),
+        enUser: smartJoin(userAnswers)
       }
     ]);
 
@@ -197,7 +199,7 @@ export default function PlayScreen({
       setFeedback('Chính xác!');
       setFeedbackClass('correct-text');
     } else {
-      setFeedback(`Đáp án đúng: ${correctArr.join(' ')}`);
+      setFeedback(`Đáp án đúng: ${smartJoin(correctArr)}`);
       setFeedbackClass('wrong-text');
     }
   }
@@ -222,12 +224,12 @@ export default function PlayScreen({
       {
         correct: false,
         vi: sentence.vi,
-        enCorrect: correctArr.join(' '),
+        enCorrect: smartJoin(correctArr),
         enUser: '(Xem đáp án)'
       }
     ]);
 
-    setFeedback(`Đáp án: ${correctArr.join(' ')}`);
+    setFeedback(`Đáp án: ${smartJoin(correctArr)}`);
     setFeedbackClass('wrong-text');
   }
 
@@ -258,130 +260,134 @@ export default function PlayScreen({
   }, [onProgress, currentIndex, results, checked, feedback, feedbackClass, userAnswers, bankWords]);
 
   return (
-    <section className="screen active" id="screen-play">
-      <div className="play-header">
-        <button className="back-link" onClick={onBack}>
-          ← Quay lại
-        </button>
-        <div>
-          <div className="progress">
-            {currentIndex + 1} / {topic.sentences.length}
-          </div>
-          <div className="progress-bar">
-            <span
-              style={{
-                width: `${((currentIndex + 1) / topic.sentences.length) * 100}%`
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="spacer" />
-
-      <div className="sentence-vi">{sentence.vi}</div>
-      <div className="sentence-audio-actions">
-        <button className="btn btn-sm" onClick={() => speakText(sentence.vi, 'vi')}>
-          🔊 Nghe câu Việt
-        </button>
-        <button className="btn btn-sm" onClick={() => speakText(sentence.en.join(' '), 'en')}>
-          🔊 Nghe câu Anh
-        </button>
-      </div>
-
-      <div className="slots-area">
-        {mode === 'drag'
-          ? userAnswers.map((ans, i) => (
-              <div
-                key={i}
-                className={`slot ${ans ? 'filled' : ''} ${
-                  checked
-                    ? ans.toLowerCase() === sentence.en[i].toLowerCase()
-                      ? 'correct'
-                      : 'wrong'
-                    : ''
-                }`}
-                onClick={() => onSlotClick(i)}
-              >
-                {ans}
-              </div>
-            ))
-          : userAnswers.map((ans, i) => (
-              <input
-                key={i}
-                ref={(el) => (inputRefs.current[i] = el)}
-                type="text"
-                className={`slot-input ${
-                  checked
-                    ? ans.toLowerCase() === sentence.en[i].toLowerCase()
-                      ? 'correct'
-                      : 'wrong'
-                    : ''
-                }`}
-                value={ans}
-                onChange={(e) => onTypeInput(i, e.target.value)}
-                readOnly={checked}
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (allFilled) checkAnswer();
-                  }
+    <section className="screen active play-layout" id="screen-play">
+      <div className="play-main">
+        <div className="play-header">
+          <button className="back-link" onClick={onBack}>
+            ← Quay lại
+          </button>
+          <div>
+            <div className="progress">
+              {currentIndex + 1} / {topic.sentences.length}
+            </div>
+            <div className="progress-bar">
+              <span
+                style={{
+                  width: `${((currentIndex + 1) / topic.sentences.length) * 100}%`
                 }}
               />
-            ))}
-      </div>
-
-      {mode === 'drag' && (
-        <>
-          <div className="bank-label">Chọn từ để sắp xếp</div>
-          <div className="word-bank">
-            {bankWords.map((b) => (
-              <div
-                key={b.id}
-                className={`word-chip ${b.used ? 'used' : ''}`}
-                onClick={() => onBankClick(b.word, b.id)}
-              >
-                {b.word}
-              </div>
-            ))}
+            </div>
           </div>
-        </>
-      )}
-
-      {mode === 'type' && (
-        <div className="hint" id="type-hint">
-          Nhập từng từ vào ô trống, dùng Tab để chuyển ô.
         </div>
-      )}
 
-      <div className={`feedback ${feedbackClass}`}>{feedback}</div>
+        <div className="spacer" />
 
-      <div className="play-actions" style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-        {!checked ? (
-          <>
-            <button
-              className="btn btn-primary"
-              disabled={!allFilled}
-              onClick={checkAnswer}
-            >
-              Kiểm tra
-            </button>
-            <button
-              className="btn"
-              onClick={showAnswer}
-            >
-              Xem đáp án
-            </button>
-          </>
-        ) : (
-          <button className="btn" onClick={nextSentence}>
-            {isLast ? 'Xem kết quả →' : 'Câu tiếp theo →'}
+        <div className="sentence-vi">{sentence.vi}</div>
+        <div className="sentence-audio-actions">
+          <button className="btn btn-sm" onClick={() => speakText(sentence.vi, 'vi')}>
+            🔊 Nghe câu Việt
           </button>
+          <button className="btn btn-sm" onClick={() => speakText(smartJoin(sentence.en), 'en')}>
+            🔊 Nghe câu Anh
+          </button>
+        </div>
+
+        <div className="slots-area">
+          {mode === 'drag'
+            ? userAnswers.map((ans, i) => (
+                <div
+                  key={i}
+                  className={`slot ${ans ? 'filled' : ''} ${
+                    checked
+                      ? ans.toLowerCase() === sentence.en[i].toLowerCase()
+                        ? 'correct'
+                        : 'wrong'
+                      : ''
+                  }`}
+                  onClick={() => onSlotClick(i)}
+                >
+                  {ans}
+                </div>
+              ))
+            : userAnswers.map((ans, i) => (
+                <input
+                  key={i}
+                  ref={(el) => (inputRefs.current[i] = el)}
+                  type="text"
+                  className={`slot-input ${
+                    checked
+                      ? ans.toLowerCase() === sentence.en[i].toLowerCase()
+                        ? 'correct'
+                        : 'wrong'
+                      : ''
+                  }`}
+                  value={ans}
+                  onChange={(e) => onTypeInput(i, e.target.value)}
+                  readOnly={checked}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (allFilled) checkAnswer();
+                    }
+                  }}
+                />
+              ))}
+        </div>
+
+        {mode === 'drag' && (
+          <>
+            <div className="bank-label">Chọn từ để sắp xếp</div>
+            <div className="word-bank">
+              {bankWords.map((b) => (
+                <div
+                  key={b.id}
+                  className={`word-chip ${b.used ? 'used' : ''}`}
+                  onClick={() => onBankClick(b.word, b.id)}
+                >
+                  {b.word}
+                </div>
+              ))}
+            </div>
+          </>
         )}
+
+        {mode === 'type' && (
+          <div className="hint" id="type-hint">
+            Nhập từng từ vào ô trống, dùng Tab để chuyển ô.
+          </div>
+        )}
+
+        <div className={`feedback ${feedbackClass}`}>{feedback}</div>
+
+        <div className="play-actions" style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          {!checked ? (
+            <>
+              <button
+                className="btn btn-primary"
+                disabled={!allFilled}
+                onClick={checkAnswer}
+              >
+                Kiểm tra
+              </button>
+              <button
+                className="btn"
+                onClick={showAnswer}
+              >
+                Xem đáp án
+              </button>
+            </>
+          ) : (
+            <button className="btn" onClick={nextSentence}>
+              {isLast ? 'Xem kết quả →' : 'Câu tiếp theo →'}
+            </button>
+          )}
+        </div>
       </div>
+
+      <ChatPanel contextSentence={sentence} />
     </section>
   );
 }

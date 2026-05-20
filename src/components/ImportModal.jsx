@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, FileText } from 'lucide-react';
 import { parseFile, parseSentences } from '../utils/fileParser';
+import { smartJoin } from '../utils/text';
 
 export default function ImportModal({ onClose, onImport }) {
   const [dragOver, setDragOver] = useState(false);
@@ -94,7 +95,7 @@ export default function ImportModal({ onClose, onImport }) {
               {preview.slice(0, 5).map((s, i) => (
                 <div className="preview-item" key={i}>
                   <div className="preview-vi">{s.vi}</div>
-                  <div className="preview-en">{s.en.join(' ')}</div>
+                  <div className="preview-en">{smartJoin(s.en)}</div>
                 </div>
               ))}
               {preview.length > 5 && (

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
 import { generatePairsWithAI } from '../utils/ai';
+import { smartJoin } from '../utils/text';
 
 export default function AiGenerateModal({ onClose, onGenerate }) {
   const [text, setText] = useState('');
@@ -97,7 +98,7 @@ export default function AiGenerateModal({ onClose, onGenerate }) {
               {preview.map((s, i) => (
                 <div className="preview-item" key={i}>
                   <div className="preview-vi">{s.vi}</div>
-                  <div className="preview-en">{Array.isArray(s.en) ? s.en.join(' ') : s.en}</div>
+                  <div className="preview-en">{Array.isArray(s.en) ? smartJoin(s.en) : s.en}</div>
                 </div>
               ))}
             </div>
