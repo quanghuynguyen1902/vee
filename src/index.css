@@ -778,7 +778,7 @@ html, body {
 }
 
 /* Play layout with chat panel */
-.play-layout {
+.screen.active.play-layout {
   flex-direction: row;
   gap: var(--space-6);
   align-items: flex-start;
