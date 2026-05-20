@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Plus } from 'lucide-react';
 
 export default function ChatPanel({ contextSentence }) {
   const [messages, setMessages] = useState([]);
@@ -60,11 +60,22 @@ export default function ChatPanel({ contextSentence }) {
     }
   }
 
+  function clearChat() {
+    setMessages([]);
+    setError('');
+    setInput('');
+  }
+
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <Bot size={18} />
-        <span>Hỏi AI</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <Bot size={18} />
+          <span>Hỏi AI</span>
+        </div>
+        <button className="chat-new-btn" onClick={clearChat} title="Đoạn chat mới">
+          <Plus size={16} />
+        </button>
       </div>
 
       <div className="chat-messages">

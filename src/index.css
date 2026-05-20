@@ -781,7 +781,7 @@ html, body {
 .screen.active.play-layout {
   flex-direction: row;
   gap: var(--space-6);
-  align-items: flex-start;
+  align-items: stretch;
   padding-bottom: var(--space-6);
 }
 
@@ -795,13 +795,10 @@ html, body {
 /* Chat panel */
 .chat-panel {
   width: 340px;
-  max-height: calc(100vh - var(--space-12));
   border: 1.5px solid var(--border);
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: var(--space-6);
   flex-shrink: 0;
 }
 
@@ -822,8 +819,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-height: 280px;
-  max-height: 60vh;
+  min-height: 0;
 }
 
 .chat-empty {
@@ -944,6 +940,25 @@ html, body {
 .chat-send-btn[disabled] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.chat-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.chat-new-btn:hover {
+  border-color: var(--fg);
+  color: var(--fg);
 }
 
 @media (max-width: 860px) {
