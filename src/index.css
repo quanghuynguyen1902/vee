@@ -51,6 +51,10 @@ html, body {
   padding: var(--space-6) var(--space-4);
 }
 
+.app-wide {
+  max-width: 1160px;
+}
+
 /* Screen visibility */
 .screen { display: none; }
 .screen.active { display: flex; flex-direction: column; flex: 1; }

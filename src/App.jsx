@@ -191,7 +191,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${screen === SCREENS.PLAY ? 'app-wide' : ''}`}>
       <header className="masthead">
         <div className="logo">
           Dịch<span className="logo-accent">.</span>Câu
