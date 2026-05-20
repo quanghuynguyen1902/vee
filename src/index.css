@@ -55,6 +55,12 @@ html, body {
   max-width: 1160px;
 }
 
+.app-play {
+  height: 100vh;
+  min-height: auto;
+  overflow: hidden;
+}
+
 /* Screen visibility */
 .screen { display: none; }
 .screen.active { display: flex; flex-direction: column; flex: 1; }
@@ -782,7 +788,8 @@ html, body {
   flex-direction: row;
   gap: var(--space-6);
   align-items: stretch;
-  padding-bottom: var(--space-6);
+  overflow: hidden;
+  min-height: 0;
 }
 
 .play-main {
@@ -790,11 +797,13 @@ html, body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 /* Chat panel */
 .chat-panel {
   width: 340px;
+  max-height: 100%;
   border: 1.5px solid var(--border);
   background: var(--surface);
   display: flex;
@@ -805,6 +814,7 @@ html, body {
 .chat-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1.5px solid var(--border);
