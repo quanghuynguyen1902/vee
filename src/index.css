@@ -800,6 +800,25 @@ html, body {
   overflow-y: auto;
 }
 
+/* Prevent flex pushing/overlap in constrained scrollable play area */
+.play-main .spacer {
+  flex: 0 0 auto;
+  height: var(--space-4);
+}
+
+.play-main .sentence-vi {
+  margin: var(--space-4) 0 var(--space-6);
+}
+
+.play-main .slots-area {
+  margin-bottom: var(--space-6);
+}
+
+.play-main .play-actions {
+  margin-top: 0;
+  padding-top: var(--space-4);
+}
+
 /* Chat panel */
 .chat-panel {
   width: 340px;
