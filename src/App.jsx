@@ -18,6 +18,7 @@ import ImportModal from './components/ImportModal';
 import AiGenerateModal from './components/AiGenerateModal';
 import DBViewer from './components/DBViewer';
 import ToastContainer, { useToast } from './components/Toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const SCREENS = {
   TOPICS: 'topics',
@@ -26,7 +27,29 @@ const SCREENS = {
   RESULT: 'result'
 };
 
+function parseRoute(pathname) {
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts.length === 0) return { screen: SCREENS.TOPICS };
+  if (parts[0] === 'create') return { screen: SCREENS.CREATE };
+  if (parts[0] === 'play' && parts[1]) {
+    return { screen: SCREENS.PLAY, topicId: decodeURIComponent(parts[1]) };
+  }
+  if (parts[0] === 'result' && parts[1]) {
+    return { screen: SCREENS.RESULT, topicId: decodeURIComponent(parts[1]) };
+  }
+  return { screen: SCREENS.TOPICS };
+}
+
+function routeFor(screen, topicId) {
+  if (screen === SCREENS.CREATE) return '/create';
+  if (screen === SCREENS.PLAY && topicId) return `/play/${encodeURIComponent(topicId)}`;
+  if (screen === SCREENS.RESULT && topicId) return `/result/${encodeURIComponent(topicId)}`;
+  return '/';
+}
+
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [screen, setScreen] = useState(SCREENS.TOPICS);
   const [currentMode, setCurrentMode] = useState('drag');
   const [currentTopic, setCurrentTopic] = useState(null);
@@ -39,6 +62,7 @@ export default function App() {
   const [showDBViewer, setShowDBViewer] = useState(false);
   const [meetingLoading, setMeetingLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [routeHandled, setRouteHandled] = useState(false);
   const { toasts, addToast, removeToast } = useToast();
 
   // Load custom topics from backend on mount
@@ -80,16 +104,11 @@ export default function App() {
     return customTopics.map((t) => ({ ...t, isBuiltIn: false }));
   }, [customTopics]);
 
-  const goTopics = useCallback(() => {
-    setScreen(SCREENS.TOPICS);
-    setCurrentTopic(null);
-    setResults([]);
-  }, []);
-
   const startTopic = useCallback(
-    async (id) => {
+    async (id, options = {}) => {
+      const { fromRoute = false, targetScreen = SCREENS.PLAY } = options;
       const topic = allTopics.find((t) => t.id === id);
-      if (!topic) return;
+      if (!topic) return false;
 
       // If custom topic, fetch full sentences from backend
       let fullTopic = topic;
@@ -103,23 +122,38 @@ export default function App() {
       }
 
       setCurrentTopic(fullTopic);
-      setResults([]);
-      setScreen(SCREENS.PLAY);
-      setTopicProgress((prev) =>
-        markTopicStarted(
-          prev,
-          fullTopic.id,
-          currentMode,
-          fullTopic.sentences?.length || topic.sentence_count || 0
-        )
-      );
+      if (targetScreen === SCREENS.PLAY) setResults([]);
+      setScreen(targetScreen);
+      if (!fromRoute) navigate(routeFor(targetScreen, fullTopic.id));
+
+      if (targetScreen === SCREENS.PLAY) {
+        setTopicProgress((prev) =>
+          markTopicStarted(
+            prev,
+            fullTopic.id,
+            currentMode,
+            fullTopic.sentences?.length || topic.sentence_count || 0
+          )
+        );
+      }
+      return true;
     },
     [allTopics, currentMode]
   );
 
+  const goTopics = useCallback((fromRoute = false) => {
+    setScreen(SCREENS.TOPICS);
+    setCurrentTopic(null);
+    setResults([]);
+    if (!fromRoute) navigate(routeFor(SCREENS.TOPICS));
+  }, [navigate]);
+
   const handleComplete = useCallback((finalResults) => {
     setResults(finalResults);
     setScreen(SCREENS.RESULT);
+    if (currentTopic?.id) {
+      navigate(routeFor(SCREENS.RESULT, currentTopic.id));
+    }
 
     if (!currentTopic) return;
     const total = finalResults.length;
@@ -133,7 +167,7 @@ export default function App() {
         totalQuestions: currentTopic.sentences?.length || total
       })
     );
-  }, [currentMode, currentTopic]);
+  }, [currentMode, currentTopic, navigate]);
 
   const handlePlayProgress = useCallback((sessionState) => {
     if (!currentTopic) return;
@@ -175,7 +209,49 @@ export default function App() {
   const handleRestart = useCallback(() => {
     setResults([]);
     setScreen(SCREENS.PLAY);
-  }, []);
+    if (currentTopic?.id) {
+      navigate(routeFor(SCREENS.PLAY, currentTopic.id));
+    }
+  }, [currentTopic, navigate]);
+
+  useEffect(() => {
+    if (loading || routeHandled) return;
+
+    const applyRoute = async (fromPopState = false) => {
+      const route = parseRoute(location.pathname);
+      if (route.screen === SCREENS.TOPICS) {
+        goTopics(true);
+      } else if (route.screen === SCREENS.CREATE) {
+        setScreen(SCREENS.CREATE);
+        setCurrentTopic(null);
+        setResults([]);
+      } else if ((route.screen === SCREENS.PLAY || route.screen === SCREENS.RESULT) && route.topicId) {
+        const ok = await startTopic(route.topicId, { fromRoute: true, targetScreen: route.screen });
+        if (!ok && !fromPopState) {
+          goTopics(true);
+          navigate(routeFor(SCREENS.TOPICS), { replace: true });
+        }
+      } else {
+        goTopics(true);
+      }
+    };
+
+    applyRoute(false).finally(() => setRouteHandled(true));
+  }, [goTopics, loading, routeHandled, startTopic, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (loading || !routeHandled) return;
+    const route = parseRoute(location.pathname);
+    if (route.screen === SCREENS.TOPICS) goTopics(true);
+    if (route.screen === SCREENS.CREATE) {
+      setScreen(SCREENS.CREATE);
+      setCurrentTopic(null);
+      setResults([]);
+    }
+    if ((route.screen === SCREENS.PLAY || route.screen === SCREENS.RESULT) && route.topicId) {
+      startTopic(route.topicId, { fromRoute: true, targetScreen: route.screen });
+    }
+  }, [location.pathname, loading, routeHandled, goTopics, startTopic]);
 
   const handleGenerateFromMeetings = useCallback(async () => {
     setMeetingLoading(true);
@@ -223,7 +299,10 @@ export default function App() {
           currentMode={currentMode}
           onSetMode={setCurrentMode}
           onStartTopic={startTopic}
-          onOpenCreate={() => setScreen(SCREENS.CREATE)}
+          onOpenCreate={() => {
+            setScreen(SCREENS.CREATE);
+            navigate(routeFor(SCREENS.CREATE));
+          }}
           onDeleteTopic={handleDeleteTopic}
           onOpenImport={() => setShowImport(true)}
           onOpenAIGenerate={() => setShowAIGenerate(true)}
@@ -242,7 +321,7 @@ export default function App() {
       )}
 
       {screen === SCREENS.CREATE && (
-        <CreateTopicScreen onBack={goTopics} onSave={handleSaveCustom} onToast={(msg, type) => addToast(msg, type)} />
+        <CreateTopicScreen onBack={() => goTopics(false)} onSave={handleSaveCustom} onToast={(msg, type) => addToast(msg, type)} />
       )}
 
       {screen === SCREENS.PLAY && currentTopic && (
@@ -251,7 +330,7 @@ export default function App() {
           mode={currentMode}
           initialProgress={topicProgress?.[currentTopic.id]}
           onProgress={handlePlayProgress}
-          onBack={goTopics}
+          onBack={() => goTopics(false)}
           onComplete={handleComplete}
         />
       )}
@@ -260,7 +339,7 @@ export default function App() {
         <ResultScreen
           topic={currentTopic}
           results={results}
-          onBack={goTopics}
+          onBack={() => goTopics(false)}
           onRestart={handleRestart}
         />
       )}
