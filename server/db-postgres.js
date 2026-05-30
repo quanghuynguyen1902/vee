@@ -7,37 +7,43 @@ let initialized = false;
 
 function getPool() {
   if (!pool) {
+    const isLocal = process.env.DATABASE_URL?.includes('localhost');
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL?.includes('localhost')
-        ? false
-        : { rejectUnauthorized: false }
+      ssl: isLocal ? false : { rejectUnauthorized: false }
     });
+    console.log('[DB] Pool created. DATABASE_URL present:', !!process.env.DATABASE_URL);
   }
   return pool;
 }
 
 async function ensureInit() {
   if (initialized) return;
-  const p = getPool();
-  await p.query(`
-    CREATE TABLE IF NOT EXISTS topics (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      source TEXT DEFAULT 'custom',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+  try {
+    const p = getPool();
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS topics (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        source TEXT DEFAULT 'custom',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS sentences (
-      id SERIAL PRIMARY KEY,
-      topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
-      vi TEXT NOT NULL,
-      en TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS sentences (
+        id SERIAL PRIMARY KEY,
+        topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+        vi TEXT NOT NULL,
+        en TEXT NOT NULL
+      );
 
-    CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
-  `);
-  initialized = true;
+      CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
+    `);
+    initialized = true;
+    console.log('[DB] Schema initialized OK');
+  } catch (err) {
+    console.error('[DB] Schema init failed:', err.message);
+    throw err;
+  }
 }
 
 export async function getAllTopics() {

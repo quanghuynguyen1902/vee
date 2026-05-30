@@ -86,11 +86,13 @@ app.get('/api/topics/:id', async (req, res) => {
 });
 
 app.post('/api/topics', async (req, res) => {
+  console.log('[API] POST /api/topics body:', req.body?.title, 'sentences:', req.body?.sentences?.length);
   try {
     const topic = await saveTopic(req.body);
+    console.log('[API] Topic saved:', topic.id);
     res.json(topic);
   } catch (err) {
-    console.error('DB error:', err);
+    console.error('[API] saveTopic error:', err.message, err.stack);
     res.status(500).json({ error: err.message });
   }
 });
