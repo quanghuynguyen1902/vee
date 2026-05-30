@@ -33,6 +33,7 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [customTopics, setCustomTopics] = useState([]);
   const [topicProgress, setTopicProgress] = useState({});
+  const [progressReady, setProgressReady] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showDBViewer, setShowDBViewer] = useState(false);
@@ -58,14 +59,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!progressReady) return;
     persistTopicProgress(topicProgress);
-  }, [topicProgress]);
+  }, [progressReady, topicProgress]);
 
   useEffect(() => {
     let cancelled = false;
     async function loadProgress() {
       const progress = await fetchTopicProgress();
-      if (!cancelled) setTopicProgress(progress || {});
+      if (!cancelled) {
+        setTopicProgress(progress || {});
+        setProgressReady(true);
+      }
     }
     loadProgress();
     return () => { cancelled = true; };
