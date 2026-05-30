@@ -18,3 +18,5 @@ export const runQuery = db.runQuery;
 export const updateRow = db.updateRow;
 export const deleteRow = db.deleteRow;
 export const insertRow = db.insertRow;
+export const getTopicProgress = db.getTopicProgress;
+export const saveTopicProgress = db.saveTopicProgress;

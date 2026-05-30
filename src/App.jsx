@@ -3,8 +3,8 @@ import './index.css';
 import { getCustomTopics, saveCustomTopic, deleteCustomTopic, getTopic } from './utils/storage';
 import { generateFromMeetings } from './utils/ai';
 import {
-  loadTopicProgress,
-  saveTopicProgress,
+  fetchTopicProgress,
+  persistTopicProgress,
   markTopicStarted,
   markTopicCompleted,
   updateTopicSession,
@@ -32,7 +32,7 @@ export default function App() {
   const [currentTopic, setCurrentTopic] = useState(null);
   const [results, setResults] = useState([]);
   const [customTopics, setCustomTopics] = useState([]);
-  const [topicProgress, setTopicProgress] = useState(() => loadTopicProgress());
+  const [topicProgress, setTopicProgress] = useState({});
   const [showImport, setShowImport] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showDBViewer, setShowDBViewer] = useState(false);
@@ -58,8 +58,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    saveTopicProgress(topicProgress);
+    persistTopicProgress(topicProgress);
   }, [topicProgress]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProgress() {
+      const progress = await fetchTopicProgress();
+      if (!cancelled) setTopicProgress(progress || {});
+    }
+    loadProgress();
+    return () => { cancelled = true; };
+  }, []);
 
   const allTopics = useMemo(() => {
     return customTopics.map((t) => ({ ...t, isBuiltIn: false }));

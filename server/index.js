@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { extractRandomMeetingFiles } from './utils/extractMeetings.js';
-import { getAllTopics, getTopicById, saveTopic, deleteTopic, getTables, runQuery, updateRow, deleteRow, insertRow } from './db.js';
+import { getAllTopics, getTopicById, saveTopic, deleteTopic, getTables, runQuery, updateRow, deleteRow, insertRow, getTopicProgress, saveTopicProgress } from './db.js';
 
 dotenv.config();
 
@@ -80,6 +80,27 @@ app.delete('/api/topics/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('DB error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/progress', async (_req, res) => {
+  try {
+    const progress = await getTopicProgress();
+    res.json(progress || {});
+  } catch (err) {
+    console.error('Progress load error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/progress', async (req, res) => {
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : {};
+    const saved = await saveTopicProgress(payload);
+    res.json(saved || {});
+  } catch (err) {
+    console.error('Progress save error:', err);
     res.status(500).json({ error: err.message });
   }
 });

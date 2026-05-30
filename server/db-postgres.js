@@ -37,6 +37,12 @@ async function ensureInit() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
+
+      CREATE TABLE IF NOT EXISTS topic_progress (
+        topic_id TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     initialized = true;
     console.log('[DB] Schema initialized OK');
@@ -176,4 +182,42 @@ export async function insertRow(table, columns, placeholders, values) {
   const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING id`;
   const result = await getPool().query(sql, values);
   return { lastInsertRowid: result.rows[0]?.id };
+}
+
+export async function getTopicProgress() {
+  await ensureInit();
+  const result = await getPool().query('SELECT topic_id, data FROM topic_progress');
+  const map = {};
+  for (const row of result.rows) {
+    map[row.topic_id] = row.data || {};
+  }
+  return map;
+}
+
+export async function saveTopicProgress(progressMap) {
+  await ensureInit();
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM topic_progress');
+    for (const [topicId, data] of Object.entries(progressMap || {})) {
+      await client.query(
+        `
+          INSERT INTO topic_progress (topic_id, data, updated_at)
+          VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP)
+          ON CONFLICT (topic_id) DO UPDATE SET
+            data = EXCLUDED.data,
+            updated_at = CURRENT_TIMESTAMP
+        `,
+        [topicId, JSON.stringify(data || {})]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+  return progressMap || {};
 }

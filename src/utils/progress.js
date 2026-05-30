@@ -16,6 +16,36 @@ export function saveTopicProgress(progressMap) {
   localStorage.setItem(LS_PROGRESS_KEY, JSON.stringify(progressMap || {}));
 }
 
+export async function fetchTopicProgress() {
+  try {
+    const res = await fetch('/api/progress');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    saveTopicProgress(data);
+    return data;
+  } catch {
+    return loadTopicProgress();
+  }
+}
+
+let saveTimer = null;
+export function persistTopicProgress(progressMap) {
+  saveTopicProgress(progressMap);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/progress', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(progressMap || {})
+      });
+    } catch {
+      // localStorage already updated as fallback
+    }
+  }, 300);
+}
+
 export function markTopicStarted(progressMap, topicId, mode, totalQuestions) {
   const now = Date.now();
   const prev = progressMap?.[topicId] || {};

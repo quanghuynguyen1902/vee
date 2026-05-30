@@ -32,6 +32,12 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
+
+  CREATE TABLE IF NOT EXISTS topic_progress (
+    topic_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at INTEGER DEFAULT (unixepoch())
+  );
 `);
 
 export async function getAllTopics() {
@@ -139,4 +145,43 @@ export async function insertRow(table, columns, placeholders, values) {
   const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
   const stmt = db.prepare(sql);
   return stmt.run(...values);
+}
+
+export async function getTopicProgress() {
+  const stmt = db.prepare('SELECT topic_id, data FROM topic_progress');
+  const rows = stmt.all();
+  const map = {};
+  for (const r of rows) {
+    try {
+      map[r.topic_id] = JSON.parse(r.data);
+    } catch {
+      map[r.topic_id] = {};
+    }
+  }
+  return map;
+}
+
+export async function saveTopicProgress(progressMap) {
+  const insertStmt = db.prepare(`
+    INSERT INTO topic_progress (topic_id, data, updated_at)
+    VALUES (?, ?, unixepoch())
+    ON CONFLICT(topic_id) DO UPDATE SET
+      data = excluded.data,
+      updated_at = unixepoch()
+  `);
+  const deleteStmt = db.prepare('DELETE FROM topic_progress');
+
+  db.exec('BEGIN');
+  try {
+    deleteStmt.run();
+    for (const [topicId, data] of Object.entries(progressMap || {})) {
+      insertStmt.run(topicId, JSON.stringify(data || {}));
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+
+  return progressMap || {};
 }
