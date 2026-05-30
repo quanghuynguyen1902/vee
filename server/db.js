@@ -1,153 +1,154 @@
-import { DatabaseSync } from 'node:sqlite';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../data/dichcau.db');
+const { Pool } = pg;
 
-// Ensure data dir exists
-const dataDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false }
+});
+
+async function initSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS topics (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      source TEXT DEFAULT 'custom',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sentences (
+      id SERIAL PRIMARY KEY,
+      topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+      vi TEXT NOT NULL,
+      en TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
+  `);
 }
 
-const db = new DatabaseSync(DB_PATH);
+await initSchema();
 
-// Initialize schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS topics (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    source TEXT DEFAULT 'custom',
-    created_at INTEGER DEFAULT (unixepoch())
-  );
-
-  CREATE TABLE IF NOT EXISTS sentences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    topic_id TEXT NOT NULL,
-    vi TEXT NOT NULL,
-    en TEXT NOT NULL,
-    FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
-`);
-
-export function getAllTopics() {
-  const stmt = db.prepare(`
+export async function getAllTopics() {
+  const result = await pool.query(`
     SELECT t.id, t.title, t.source, t.created_at,
       (SELECT COUNT(*) FROM sentences s WHERE s.topic_id = t.id) as sentence_count
     FROM topics t
     ORDER BY t.created_at DESC
   `);
-  return stmt.all();
+  return result.rows;
 }
 
-export function getTopicById(id) {
-  const topicStmt = db.prepare('SELECT * FROM topics WHERE id = ?');
-  const topic = topicStmt.get(id);
+export async function getTopicById(id) {
+  const topicResult = await pool.query('SELECT * FROM topics WHERE id = $1', [id]);
+  const topic = topicResult.rows[0];
   if (!topic) return null;
 
-  const sentencesStmt = db.prepare('SELECT vi, en FROM sentences WHERE topic_id = ? ORDER BY id');
-  const rows = sentencesStmt.all(id);
+  const sentencesResult = await pool.query(
+    'SELECT vi, en FROM sentences WHERE topic_id = $1 ORDER BY id',
+    [id]
+  );
 
   return {
     ...topic,
-    sentences: rows.map(r => ({
+    sentences: sentencesResult.rows.map(r => ({
       vi: r.vi,
       en: JSON.parse(r.en)
     }))
   };
 }
 
-export function saveTopic(topic) {
-  const insertTopic = db.prepare('INSERT OR REPLACE INTO topics (id, title, source) VALUES (?, ?, ?)');
-  const deleteSentences = db.prepare('DELETE FROM sentences WHERE topic_id = ?');
-  const insertSentence = db.prepare('INSERT INTO sentences (topic_id, vi, en) VALUES (?, ?, ?)');
-
-  db.exec('BEGIN');
+export async function saveTopic(topic) {
+  const client = await pool.connect();
   try {
-    insertTopic.run(topic.id, topic.title, topic.source || 'custom');
-    deleteSentences.run(topic.id);
+    await client.query('BEGIN');
+
+    await client.query(
+      'INSERT INTO topics (id, title, source) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, source = EXCLUDED.source',
+      [topic.id, topic.title, topic.source || 'custom']
+    );
+
+    await client.query('DELETE FROM sentences WHERE topic_id = $1', [topic.id]);
+
     for (const s of topic.sentences) {
-      insertSentence.run(topic.id, s.vi, JSON.stringify(s.en));
+      await client.query(
+        'INSERT INTO sentences (topic_id, vi, en) VALUES ($1, $2, $3)',
+        [topic.id, s.vi, JSON.stringify(s.en)]
+      );
     }
-    db.exec('COMMIT');
+
+    await client.query('COMMIT');
   } catch (err) {
-    db.exec('ROLLBACK');
+    await client.query('ROLLBACK');
     throw err;
+  } finally {
+    client.release();
   }
 
   return topic;
 }
 
-export function deleteTopic(id) {
-  const stmt = db.prepare('DELETE FROM topics WHERE id = ?');
-  stmt.run(id);
+export async function deleteTopic(id) {
+  await pool.query('DELETE FROM topics WHERE id = $1', [id]);
 }
 
-export function clearAllTopics() {
-  db.exec('DELETE FROM sentences; DELETE FROM topics;');
+export async function clearAllTopics() {
+  await pool.query('DELETE FROM sentences');
+  await pool.query('DELETE FROM topics');
 }
 
-// Admin: get all tables
-export function getTables() {
-  const stmt = db.prepare(`
-    SELECT name FROM sqlite_master 
-    WHERE type='table' AND name NOT LIKE 'sqlite_%'
-    ORDER BY name
+export async function getTables() {
+  const result = await pool.query(`
+    SELECT tablename as name FROM pg_tables
+    WHERE schemaname = 'public'
+    ORDER BY tablename
   `);
-  return stmt.all();
+  return result.rows;
 }
 
-// Admin: run query (SELECT only for safety)
-export function runQuery(sql) {
-  // Only allow SELECT queries for safety
+export async function runQuery(sql) {
   const trimmed = sql.trim().toUpperCase();
-  const isSafe = trimmed.startsWith('SELECT') || 
-                 trimmed.startsWith('WITH');
-  
+  const isSafe = trimmed.startsWith('SELECT') || trimmed.startsWith('WITH');
+
   if (!isSafe) {
     throw new Error('Chỉ cho phép truy vấn SELECT');
   }
 
-  const stmt = db.prepare(sql);
-  return stmt.all();
+  const result = await pool.query(sql);
+  return result.rows;
 }
 
-// Admin: update row
-export function updateRow(table, setClause, whereClause, values) {
+export async function updateRow(table, setClause, whereClause, values) {
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
-  
+
   const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
-  const stmt = db.prepare(sql);
-  return stmt.run(...values);
+  const result = await pool.query(sql, values);
+  return { changes: result.rowCount };
 }
 
-// Admin: delete row
-export function deleteRow(table, whereClause, values) {
+export async function deleteRow(table, whereClause, values) {
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
-  
+
   const sql = `DELETE FROM ${table} WHERE ${whereClause}`;
-  const stmt = db.prepare(sql);
-  return stmt.run(...values);
+  const result = await pool.query(sql, values);
+  return { changes: result.rowCount };
 }
 
-// Admin: insert row
-export function insertRow(table, columns, placeholders, values) {
+export async function insertRow(table, columns, placeholders, values) {
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
-  
-  const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
-  const stmt = db.prepare(sql);
-  return stmt.run(...values);
+
+  const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING id`;
+  const result = await pool.query(sql, values);
+  return { lastInsertRowid: result.rows[0]?.id };
 }

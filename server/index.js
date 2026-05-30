@@ -63,9 +63,9 @@ function requireAdmin(req, res, next) {
 }
 
 // ---- Topics API (SQLite) ----
-app.get('/api/topics', (req, res) => {
+app.get('/api/topics', async (req, res) => {
   try {
-    const rows = getAllTopics();
+    const rows = await getAllTopics();
     res.json(rows);
   } catch (err) {
     console.error('DB error:', err);
@@ -73,9 +73,9 @@ app.get('/api/topics', (req, res) => {
   }
 });
 
-app.get('/api/topics/:id', (req, res) => {
+app.get('/api/topics/:id', async (req, res) => {
   try {
-    const topic = getTopicById(req.params.id);
+    const topic = await getTopicById(req.params.id);
     if (!topic) return res.status(404).json({ error: 'Không tìm thấy chủ đề' });
     res.json(topic);
   } catch (err) {
@@ -84,9 +84,9 @@ app.get('/api/topics/:id', (req, res) => {
   }
 });
 
-app.post('/api/topics', (req, res) => {
+app.post('/api/topics', async (req, res) => {
   try {
-    const topic = saveTopic(req.body);
+    const topic = await saveTopic(req.body);
     res.json(topic);
   } catch (err) {
     console.error('DB error:', err);
@@ -94,9 +94,9 @@ app.post('/api/topics', (req, res) => {
   }
 });
 
-app.delete('/api/topics/:id', (req, res) => {
+app.delete('/api/topics/:id', async (req, res) => {
   try {
-    deleteTopic(req.params.id);
+    await deleteTopic(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     console.error('DB error:', err);
@@ -327,49 +327,49 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 // ---- Admin DB Viewer API ----
 app.use('/api/admin', requireAdmin);
 
-app.get('/api/admin/tables', (req, res) => {
+app.get('/api/admin/tables', async (req, res) => {
   try {
-    const tables = getTables();
+    const tables = await getTables();
     res.json(tables);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/query', (req, res) => {
+app.post('/api/admin/query', async (req, res) => {
   try {
     const { sql } = req.body;
-    const rows = runQuery(sql);
+    const rows = await runQuery(sql);
     res.json(rows);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/update', (req, res) => {
+app.post('/api/admin/update', async (req, res) => {
   try {
     const { table, setClause, whereClause, values } = req.body;
-    const result = updateRow(table, setClause, whereClause, values);
+    const result = await updateRow(table, setClause, whereClause, values);
     res.json({ ok: true, changes: result.changes });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/delete', (req, res) => {
+app.post('/api/admin/delete', async (req, res) => {
   try {
     const { table, whereClause, values } = req.body;
-    const result = deleteRow(table, whereClause, values);
+    const result = await deleteRow(table, whereClause, values);
     res.json({ ok: true, changes: result.changes });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/insert', (req, res) => {
+app.post('/api/admin/insert', async (req, res) => {
   try {
     const { table, columns, placeholders, values } = req.body;
-    const result = insertRow(table, columns, placeholders, values);
+    const result = await insertRow(table, columns, placeholders, values);
     res.json({ ok: true, lastID: result.lastInsertRowid });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -381,6 +381,12 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+// Export for Vercel serverless
+export default app;
+
+// Only start server in local dev
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Backend running on http://localhost:${PORT}`);
+  });
+}
