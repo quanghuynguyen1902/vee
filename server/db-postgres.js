@@ -2,15 +2,25 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('localhost')
-    ? false
-    : { rejectUnauthorized: false }
-});
+let pool = null;
+let initialized = false;
 
-async function initSchema() {
-  await pool.query(`
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL?.includes('localhost')
+        ? false
+        : { rejectUnauthorized: false }
+    });
+  }
+  return pool;
+}
+
+async function ensureInit() {
+  if (initialized) return;
+  const p = getPool();
+  await p.query(`
     CREATE TABLE IF NOT EXISTS topics (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -27,12 +37,12 @@ async function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_sentences_topic ON sentences(topic_id);
   `);
+  initialized = true;
 }
 
-await initSchema();
-
 export async function getAllTopics() {
-  const result = await pool.query(`
+  await ensureInit();
+  const result = await getPool().query(`
     SELECT t.id, t.title, t.source, t.created_at,
       (SELECT COUNT(*) FROM sentences s WHERE s.topic_id = t.id) as sentence_count
     FROM topics t
@@ -42,11 +52,12 @@ export async function getAllTopics() {
 }
 
 export async function getTopicById(id) {
-  const topicResult = await pool.query('SELECT * FROM topics WHERE id = $1', [id]);
+  await ensureInit();
+  const topicResult = await getPool().query('SELECT * FROM topics WHERE id = $1', [id]);
   const topic = topicResult.rows[0];
   if (!topic) return null;
 
-  const sentencesResult = await pool.query(
+  const sentencesResult = await getPool().query(
     'SELECT vi, en FROM sentences WHERE topic_id = $1 ORDER BY id',
     [id]
   );
@@ -61,7 +72,8 @@ export async function getTopicById(id) {
 }
 
 export async function saveTopic(topic) {
-  const client = await pool.connect();
+  await ensureInit();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
@@ -91,16 +103,19 @@ export async function saveTopic(topic) {
 }
 
 export async function deleteTopic(id) {
-  await pool.query('DELETE FROM topics WHERE id = $1', [id]);
+  await ensureInit();
+  await getPool().query('DELETE FROM topics WHERE id = $1', [id]);
 }
 
 export async function clearAllTopics() {
-  await pool.query('DELETE FROM sentences');
-  await pool.query('DELETE FROM topics');
+  await ensureInit();
+  await getPool().query('DELETE FROM sentences');
+  await getPool().query('DELETE FROM topics');
 }
 
 export async function getTables() {
-  const result = await pool.query(`
+  await ensureInit();
+  const result = await getPool().query(`
     SELECT tablename as name FROM pg_tables
     WHERE schemaname = 'public'
     ORDER BY tablename
@@ -109,6 +124,7 @@ export async function getTables() {
 }
 
 export async function runQuery(sql) {
+  await ensureInit();
   const trimmed = sql.trim().toUpperCase();
   const isSafe = trimmed.startsWith('SELECT') || trimmed.startsWith('WITH');
 
@@ -116,39 +132,42 @@ export async function runQuery(sql) {
     throw new Error('Chỉ cho phép truy vấn SELECT');
   }
 
-  const result = await pool.query(sql);
+  const result = await getPool().query(sql);
   return result.rows;
 }
 
 export async function updateRow(table, setClause, whereClause, values) {
+  await ensureInit();
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
 
   const sql = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
-  const result = await pool.query(sql, values);
+  const result = await getPool().query(sql, values);
   return { changes: result.rowCount };
 }
 
 export async function deleteRow(table, whereClause, values) {
+  await ensureInit();
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
 
   const sql = `DELETE FROM ${table} WHERE ${whereClause}`;
-  const result = await pool.query(sql, values);
+  const result = await getPool().query(sql, values);
   return { changes: result.rowCount };
 }
 
 export async function insertRow(table, columns, placeholders, values) {
+  await ensureInit();
   const allowedTables = ['topics', 'sentences'];
   if (!allowedTables.includes(table)) {
     throw new Error('Table không hợp lệ');
   }
 
   const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING id`;
-  const result = await pool.query(sql, values);
+  const result = await getPool().query(sql, values);
   return { lastInsertRowid: result.rows[0]?.id };
 }
