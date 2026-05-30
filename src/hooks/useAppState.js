@@ -84,7 +84,7 @@ export function useAppState() {
       if (!topic.isBuiltIn) {
         try {
           const detail = await getTopic(id);
-          if (detail) fullTopic = detail;
+          if (detail) fullTopic = { ...detail, id: detail.id || id };
         } catch (err) {
           console.warn('Could not fetch topic detail:', err);
         }
@@ -93,7 +93,7 @@ export function useAppState() {
       setCurrentTopic(fullTopic);
       if (targetScreen === SCREENS.PLAY) setResults([]);
       setScreen(targetScreen);
-      if (!fromRoute) navigate(routeFor(targetScreen, fullTopic.id));
+      if (!fromRoute) navigate(routeFor(targetScreen, id));
 
       if (targetScreen === SCREENS.PLAY) {
         setTopicProgress((prev) =>
