@@ -160,6 +160,61 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
   }
 });
 
+app.post('/api/generate-from-topic', generateLimiter, async (req, res) => {
+  const { topic } = req.body;
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Server chưa cấu hình API key' });
+  }
+
+  if (!topic || !topic.trim()) {
+    return res.status(400).json({ error: 'Vui lòng cung cấp tên chủ đề' });
+  }
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': process.env.APP_URL || 'https://dichcau.app',
+        'X-Title': 'DichCau'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a bilingual assistant creating English vocabulary exercises. Given a topic name, produce 15 natural-sounding Vietnamese sentences and accurate English translations related to that topic. Break each English sentence into an array of meaningful tokens. Keep contractions as single tokens (e.g., "don\'t", "I\'m", "can\'t"). Keep proper nouns and multi-word terms as single tokens when they represent one semantic unit. The Vietnamese sentence should be natural, not a word-for-word translation.\n\nIMPORTANT: Use first-person perspective (I, we, my, our) instead of third-person (he, she, Tom, they). Do NOT include any specific personal names (e.g., Huy, Nguyên, Tom, Tom Nguyen, John, Mary). If a sentence needs to refer to a person, use "I", "we", or generic references like "my team" or "the team" instead of named individuals.'
+          },
+          {
+            role: 'user',
+            content: `Create 15 diverse sentences about the topic "${topic.trim()}". For each sentence:\n1. A natural Vietnamese sentence that fits the topic\n2. The English sentence broken down into meaningful tokens (in correct order). Keep contractions as single tokens (e.g., "don't", "I'm", "can't"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit.\n\nCRITICAL RULES:\n- Use first-person perspective (I, we, my, our) instead of third-person.\n- NEVER include specific personal names like Huy, Nguyên, Tom, Tom Nguyen, John, Mary, etc.\n- If referring to a person, use "I", "we", "my team", or omit the name entirely.\n\nReturn ONLY a JSON object with a "sentences" array: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}. Do not include markdown formatting or extra text.`
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(502).json({ error: err.error?.message || `OpenRouter error: ${response.status}` });
+    }
+
+    const data = await response.json();
+    let content = data.choices[0].message.content;
+
+    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
+    if (jsonMatch) content = jsonMatch[1];
+
+    const parsed = JSON.parse(content);
+    return res.json({ sentences: parsed.sentences || parsed.pairs || parsed });
+  } catch (err) {
+    console.error('API error:', err);
+    return res.status(500).json({ error: err.message || 'Lỗi server' });
+  }
+});
+
 app.post('/api/generate-from-meetings', generateLimiter, async (_req, res) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
 

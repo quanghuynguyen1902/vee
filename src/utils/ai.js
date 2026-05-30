@@ -52,6 +52,29 @@ export async function generatePairsWithAI(vietnameseText) {
   }
 }
 
+export async function generateFromTopic(topicName) {
+  try {
+    const response = await fetch('/api/generate-from-topic', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ topic: topicName })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.sentences || [];
+  } catch (err) {
+    console.warn('Topic generation failed:', err.message);
+    throw err;
+  }
+}
+
 export async function generateFromMeetings() {
   // Call backend to generate from meeting data in server/meeting folder
   try {

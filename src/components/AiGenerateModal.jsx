@@ -1,24 +1,23 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
-import { generatePairsWithAI } from '../utils/ai';
+import { generateFromTopic } from '../utils/ai';
 import { smartJoin } from '../utils/text';
 
 export default function AiGenerateModal({ onClose, onGenerate }) {
-  const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);
   const [topicName, setTopicName] = useState('');
 
   async function handleGenerate() {
-    if (!text.trim()) {
-      setError('Vui lòng nhập văn bản tiếng Việt.');
+    if (!topicName.trim()) {
+      setError('Vui lòng nhập tên chủ đề.');
       return;
     }
     setError('');
     setLoading(true);
     try {
-      const sentences = await generatePairsWithAI(text);
+      const sentences = await generateFromTopic(topicName.trim());
       if (!sentences || sentences.length === 0) {
         setError('Không tạo được câu nào. Vui lòng thử lại.');
       } else {
@@ -58,21 +57,13 @@ export default function AiGenerateModal({ onClose, onGenerate }) {
               <input
                 className="form-input"
                 type="text"
-                placeholder="VD: Công nghệ, Sức khỏe..."
+                placeholder="VD: Công nghệ, Sức khỏe, Du lịch..."
                 value={topicName}
                 onChange={(e) => setTopicName(e.target.value)}
               />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Văn bản tiếng Việt</label>
-              <textarea
-                className="form-textarea"
-                rows={6}
-                placeholder="Dán văn bản tiếng Việt vào đây. AI sẽ tự động tách câu và tạo bản dịch tiếng Anh..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
+              <p className="hint-text" style={{ marginTop: 'var(--space-2)' }}>
+                AI sẽ tự động tạo 15 câu luyện dịch phù hợp với chủ đề bạn nhập.
+              </p>
             </div>
 
             {error && <p className="modal-error">{error}</p>}

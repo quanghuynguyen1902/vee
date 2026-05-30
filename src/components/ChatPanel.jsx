@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Plus } from 'lucide-react';
+import { Send, Bot, User, Loader2, Plus, X } from 'lucide-react';
 
 export default function ChatPanel({ contextSentence }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -66,76 +67,91 @@ export default function ChatPanel({ contextSentence }) {
     setInput('');
   }
 
+  if (!isOpen) {
+    return (
+      <button className="chat-fab" onClick={() => setIsOpen(true)} title="Hỏi AI">
+        <Bot size={22} />
+      </button>
+    );
+  }
+
   return (
-    <div className="chat-panel">
-      <div className="chat-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <Bot size={18} />
-          <span>Hỏi AI</span>
+    <div className="chat-popup">
+      <div className="chat-panel">
+        <div className="chat-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <Bot size={18} />
+            <span>Hỏi AI</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <button className="chat-new-btn" onClick={clearChat} title="Đoạn chat mới">
+              <Plus size={16} />
+            </button>
+            <button className="chat-close-btn" onClick={() => setIsOpen(false)} title="Đóng">
+              <X size={16} />
+            </button>
+          </div>
         </div>
-        <button className="chat-new-btn" onClick={clearChat} title="Đoạn chat mới">
-          <Plus size={16} />
-        </button>
-      </div>
 
-      <div className="chat-messages">
-        {messages.length === 0 && (
-          <div className="chat-empty">
-            <Bot size={32} />
-            <p>Hỏi AI về từ vựng, ngữ pháp, hoặc cách dịch câu này.</p>
-          </div>
-        )}
+        <div className="chat-messages">
+          {messages.length === 0 && (
+            <div className="chat-empty">
+              <Bot size={32} />
+              <p>Hỏi AI về từ vựng, ngữ pháp, hoặc cách dịch câu này.</p>
+            </div>
+          )}
 
-        {messages.map((m, i) => (
-          <div key={i} className={`chat-bubble ${m.role}`}>
-            <div className="chat-avatar">
-              {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-            </div>
-            <div className="chat-content">
-              <div className="chat-text">{m.content}</div>
-            </div>
-          </div>
-        ))}
-
-        {loading && (
-          <div className="chat-bubble assistant">
-            <div className="chat-avatar">
-              <Bot size={14} />
-            </div>
-            <div className="chat-content">
-              <div className="chat-text">
-                <Loader2 size={14} className="spin" />
+          {messages.map((m, i) => (
+            <div key={i} className={`chat-bubble ${m.role}`}>
+              <div className="chat-avatar">
+                {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+              </div>
+              <div className="chat-content">
+                <div className="chat-text">{m.content}</div>
               </div>
             </div>
-          </div>
-        )}
+          ))}
 
-        {error && (
-          <div className="chat-error">
-            {error}
-          </div>
-        )}
+          {loading && (
+            <div className="chat-bubble assistant">
+              <div className="chat-avatar">
+                <Bot size={14} />
+              </div>
+              <div className="chat-content">
+                <div className="chat-text">
+                  <Loader2 size={14} className="spin" />
+                </div>
+              </div>
+            </div>
+          )}
 
-        <div ref={bottomRef} />
-      </div>
+          {error && (
+            <div className="chat-error">
+              {error}
+            </div>
+          )}
 
-      <div className="chat-input-area">
-        <input
-          type="text"
-          className="chat-input"
-          placeholder="Nhập câu hỏi..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={loading}
-        />
-        <button
-          className="chat-send-btn"
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-        >
-          <Send size={16} />
-        </button>
+          <div ref={bottomRef} />
+        </div>
+
+        <div className="chat-input-area">
+          <input
+            type="text"
+            className="chat-input"
+            placeholder="Nhập câu hỏi..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={loading}
+          />
+          <button
+            className="chat-send-btn"
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+          >
+            <Send size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
