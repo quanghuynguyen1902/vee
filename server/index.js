@@ -216,6 +216,10 @@ app.post('/api/generate-from-topic', generateLimiter, async (req, res) => {
 });
 
 app.post('/api/generate-from-meetings', generateLimiter, async (_req, res) => {
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return res.status(501).json({ error: 'Chức năng này không khả dụng trên production.' });
+  }
+
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {

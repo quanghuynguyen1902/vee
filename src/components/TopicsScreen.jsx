@@ -46,9 +46,11 @@ export default function TopicsScreen({
           <button className="btn btn-sm" onClick={onOpenAIGenerate}>
             <Sparkles size={14} /> AI Generate
           </button>
-          <button className="btn btn-sm" onClick={onGenerateFromMeetings}>
-            <Video size={14} /> Tạo từ Meeting
-          </button>
+          {import.meta.env.DEV && (
+            <button className="btn btn-sm" onClick={onGenerateFromMeetings}>
+              <Video size={14} /> Tạo từ Meeting
+            </button>
+          )}
           <button className="btn btn-sm" onClick={onOpenDBViewer}>
             <Database size={14} /> DB Viewer
           </button>
