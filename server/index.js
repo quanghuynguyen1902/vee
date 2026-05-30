@@ -11,32 +11,7 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
-function normalizeOrigin(value) {
-  if (!value) return '';
-  return value.trim().replace(/\/+$/, '');
-}
-
-const envOrigins = (process.env.APP_URL || '')
-  .split(',')
-  .map(normalizeOrigin)
-  .filter(Boolean);
-
-const devOrigins = process.env.NODE_ENV === 'production'
-  ? []
-  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
-
-const allowedOrigins = new Set([...envOrigins, ...devOrigins].map(normalizeOrigin));
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, mobile apps, same-server)
-    if (!origin) return callback(null, true);
-    // Allow all Vercel preview/production domains + configured origins + localhost
-    if (process.env.VERCEL) return callback(null, true);
-    if (allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
-  }
-}));
+app.use(cors());
 app.use(express.json());
 
 // ---- Rate limiters ----
