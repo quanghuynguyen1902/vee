@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { smartJoin } from '../utils/text';
+import { buildSpeechSettings, choosePreferredVoice } from '../utils/tts';
 import ChatPanel from './ChatPanel';
 
 function shuffle(arr) {
@@ -34,6 +35,7 @@ export default function PlayScreen({
   const [feedback, setFeedback] = useState('');
   const [feedbackClass, setFeedbackClass] = useState('');
   const [results, setResults] = useState([]);
+  const [voicesReady, setVoicesReady] = useState(false);
   const hasRestoredRef = useRef(false);
   const inputRefs = useRef([]);
 
@@ -87,6 +89,19 @@ export default function PlayScreen({
   }, [topic, mode]);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined;
+
+    const synth = window.speechSynthesis;
+    const syncVoices = () => {
+      setVoicesReady(synth.getVoices().length > 0);
+    };
+
+    syncVoices();
+    synth.addEventListener?.('voiceschanged', syncVoices);
+    return () => synth.removeEventListener?.('voiceschanged', syncVoices);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -94,29 +109,28 @@ export default function PlayScreen({
     };
   }, []);
 
-  function pickVoice(langPrefix) {
+  function pickVoice(lang) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
-
-    return (
-      voices.find((v) => v.lang?.toLowerCase().startsWith(langPrefix)) ||
-      voices.find((v) => v.lang?.toLowerCase().startsWith('en')) ||
-      voices[0]
-    );
+    return choosePreferredVoice(voices, lang);
   }
 
-  function speakText(text, langPrefix) {
+  function speakText(text, { lang = 'en-US', slow = false } = {}) {
     if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickVoice(langPrefix);
+    const voice = pickVoice(lang);
+    const settings = buildSpeechSettings({ lang: voice?.lang || lang, slow });
     if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang || (langPrefix === 'vi' ? 'vi-VN' : 'en-US');
-    utterance.rate = 0.95;
-    window.speechSynthesis.speak(utterance);
+    utterance.lang = settings.lang;
+    utterance.rate = settings.rate;
+    synth.speak(utterance);
   }
+
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
   function loadSentence(idx) {
     setChecked(false);
@@ -292,13 +306,38 @@ export default function PlayScreen({
 
         <div className="sentence-vi">{sentence.vi}</div>
         <div className="sentence-audio-actions">
-          <button className="btn btn-sm" onClick={() => speakText(sentence.vi, 'vi')}>
+          <button
+            className="btn btn-sm"
+            disabled={!speechSupported || !voicesReady}
+            onClick={() => speakText(sentence.vi, { lang: 'vi-VN' })}
+          >
             🔊 Nghe câu Việt
           </button>
-          <button className="btn btn-sm" onClick={() => speakText(smartJoin(sentence.en), 'en')}>
-            🔊 Nghe câu Anh
+          <button
+            className="btn btn-sm"
+            disabled={!speechSupported || !voicesReady}
+            onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-US' })}
+          >
+            🔊 Anh Mỹ
+          </button>
+          <button
+            className="btn btn-sm"
+            disabled={!speechSupported || !voicesReady}
+            onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-GB' })}
+          >
+            🔊 Anh Anh
+          </button>
+          <button
+            className="btn btn-sm"
+            disabled={!speechSupported || !voicesReady}
+            onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-US', slow: true })}
+          >
+            🔊 Nghe chậm
           </button>
         </div>
+        {speechSupported && !voicesReady && (
+          <div className="hint">Đang tải giọng đọc trên trình duyệt...</div>
+        )}
 
         <div className="slots-area">
           {mode === 'drag'
