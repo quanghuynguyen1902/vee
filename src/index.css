@@ -462,8 +462,6 @@ html, body {
 
 /* Type mode input */
 .slot-input {
-  min-width: 90px;
-  width: 110px;
   height: 48px;
   border: none;
   border-bottom: 2.5px solid var(--border);
@@ -479,6 +477,11 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.slot-input::placeholder {
+  color: var(--muted);
+  letter-spacing: 0.08em;
 }
 
 .slot-input:focus {

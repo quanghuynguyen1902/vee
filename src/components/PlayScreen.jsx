@@ -11,6 +11,14 @@ function shuffle(arr) {
   return a;
 }
 
+function getTypeSlotStyle(word = '') {
+  const charCount = Math.max(word.length, 1);
+  return {
+    width: `calc(${charCount}ch + var(--space-4))`,
+    minWidth: `calc(${charCount}ch + var(--space-4))`
+  };
+}
+
 export default function PlayScreen({
   topic,
   mode,
@@ -310,13 +318,18 @@ export default function PlayScreen({
                 </div>
               ))
             : userAnswers.map((ans, i) => {
+                const targetWord = sentence.en[i] || '';
                 const statusClass = checked
-                  ? ans.toLowerCase() === sentence.en[i].toLowerCase()
+                  ? ans.toLowerCase() === targetWord.toLowerCase()
                     ? 'correct'
                     : 'wrong'
                   : '';
                 return checked ? (
-                  <div key={i} className={`slot-input ${statusClass}`}>
+                  <div
+                    key={i}
+                    className={`slot-input ${statusClass}`}
+                    style={getTypeSlotStyle(targetWord)}
+                  >
                     {ans}
                   </div>
                 ) : (
@@ -326,6 +339,8 @@ export default function PlayScreen({
                     type="text"
                     className={`slot-input ${statusClass}`}
                     value={ans}
+                    style={getTypeSlotStyle(targetWord)}
+                    placeholder={'-'.repeat(targetWord.length)}
                     onChange={(e) => onTypeInput(i, e.target.value)}
                     autoComplete="off"
                     autoCapitalize="off"
