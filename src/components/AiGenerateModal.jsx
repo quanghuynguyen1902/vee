@@ -62,7 +62,7 @@ export default function AiGenerateModal({ onClose, onGenerate }) {
                 onChange={(e) => setTopicName(e.target.value)}
               />
               <p className="hint-text" style={{ marginTop: 'var(--space-2)' }}>
-                AI sẽ tự động tạo 15 câu luyện dịch phù hợp với chủ đề bạn nhập.
+                AI sẽ tạo 10 câu luyện dịch B1–B2 dựa trên các tình huống thực tế của chủ đề bạn nhập.
               </p>
             </div>
 
