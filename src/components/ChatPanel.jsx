@@ -81,7 +81,7 @@ export default function ChatPanel({ contextSentence }) {
         <div className="chat-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <Bot size={18} />
-            <span>Hỏi AI</span>
+            <span>Vee AI</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <button className="chat-new-btn" onClick={clearChat} title="Đoạn chat mới">
@@ -97,7 +97,8 @@ export default function ChatPanel({ contextSentence }) {
           {messages.length === 0 && (
             <div className="chat-empty">
               <Bot size={32} />
-              <p>Hỏi AI về từ vựng, ngữ pháp, hoặc cách dịch câu này.</p>
+              <strong>Học cùng Vee AI</strong>
+              <p>Hỏi về từ vựng, ngữ pháp hoặc cách dịch tự nhiên hơn cho câu này.</p>
             </div>
           )}
 
@@ -138,7 +139,7 @@ export default function ChatPanel({ contextSentence }) {
           <input
             type="text"
             className="chat-input"
-            placeholder="Nhập câu hỏi..."
+            placeholder="Hỏi Vee về câu này..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

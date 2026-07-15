@@ -44,7 +44,13 @@ export default function AiGenerateModal({ onClose, onGenerate }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>AI Generate</h2>
+          <div className="modal-heading">
+            <div className="modal-feature-icon"><Sparkles size={19} /></div>
+            <div>
+              <div className="eyebrow">Vee AI</div>
+              <h2>Tạo chủ đề bằng AI</h2>
+            </div>
+          </div>
           <button className="modal-close" onClick={onClose}>
             <X size={18} />
           </button>
@@ -62,7 +68,7 @@ export default function AiGenerateModal({ onClose, onGenerate }) {
                 onChange={(e) => setTopicName(e.target.value)}
               />
               <p className="hint-text" style={{ marginTop: 'var(--space-2)' }}>
-                AI sẽ tạo 10 câu luyện dịch B1–B2 dựa trên các tình huống thực tế của chủ đề bạn nhập.
+                Vee sẽ tạo 10 câu luyện dịch B1–B2 từ những tình huống thực tế thuộc chủ đề bạn nhập.
               </p>
             </div>
 

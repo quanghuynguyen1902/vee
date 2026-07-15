@@ -1,3 +1,5 @@
+import { LayoutGrid, RotateCcw, Trophy } from 'lucide-react';
+
 export default function ResultScreen({ topic, results, onBack, onRestart }) {
   const correctCount = results.filter((r) => r.correct).length;
   const total = results.length;
@@ -7,20 +9,18 @@ export default function ResultScreen({ topic, results, onBack, onRestart }) {
     <section className="screen active" id="screen-result">
       <div className="result-header">
         <div className="score-ring">
+          <Trophy size={24} />
           <div className="score-number">{score}</div>
-          <div className="score-label">Điểm</div>
+          <div className="score-label">Điểm số</div>
         </div>
-        <div className="eyebrow" style={{ textAlign: 'center' }}>
-          Hoàn thành
+        <div className="eyebrow result-eyebrow">
+          Hoàn thành xuất sắc
         </div>
-        <h1 className="title" style={{ textAlign: 'center' }}>
-          Bạn đã hoàn thành bài học
+        <h1 className="title">
+          Thêm một bước tiến mới!
         </h1>
-        <p
-          className="subtitle"
-          style={{ margin: 'var(--space-2) auto 0', textAlign: 'center' }}
-        >
-          {topic.title}
+        <p className="subtitle">
+          Bạn đã hoàn thành chủ đề <strong>{topic.title}</strong> với {correctCount}/{total} câu chính xác.
         </p>
       </div>
 
@@ -46,10 +46,10 @@ export default function ResultScreen({ topic, results, onBack, onRestart }) {
 
       <div className="result-actions">
         <button className="btn" onClick={onBack}>
-          Chọn chủ đề khác
+          <LayoutGrid size={17} /> Chủ đề khác
         </button>
         <button className="btn btn-primary" onClick={onRestart}>
-          Làm lại
+          <RotateCcw size={17} /> Luyện lại
         </button>
       </div>
     </section>

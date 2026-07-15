@@ -16,15 +16,13 @@ export default function AppScreens({
   setCurrentMode,
   setShowAIGenerate,
   setShowDBViewer,
-  setShowImport,
   startTopic,
   goTopics,
   handleDeleteTopic,
   handleSaveCustom,
   handlePlayProgress,
   handleComplete,
-  handleRestart,
-  handleGenerateFromMeetings
+  handleRestart
 }) {
   return (
     <>
@@ -37,9 +35,7 @@ export default function AppScreens({
           onStartTopic={startTopic}
           onOpenCreate={openCreate}
           onDeleteTopic={handleDeleteTopic}
-          onOpenImport={() => setShowImport(true)}
           onOpenAIGenerate={() => setShowAIGenerate(true)}
-          onGenerateFromMeetings={handleGenerateFromMeetings}
           onOpenDBViewer={() => setShowDBViewer(true)}
         />
       )}

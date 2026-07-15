@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, AudioLines, Check, Ear, Eye, Gauge, Volume2 } from 'lucide-react';
 import { smartJoin } from '../utils/text';
 import { buildSpeechSettings, choosePreferredVoice } from '../utils/tts';
 import ChatPanel from './ChatPanel';
@@ -286,11 +287,12 @@ export default function PlayScreen({
       <div className="play-main">
         <div className="play-header">
           <button className="back-link" onClick={onBack}>
-            ← Quay lại
+            <ArrowLeft size={17} /> Quay lại
           </button>
-          <div>
+          <div className="play-topic-label">{topic.title}</div>
+          <div className="progress-wrap">
             <div className="progress">
-              {currentIndex + 1} / {topic.sentences.length}
+              Câu {currentIndex + 1} / {topic.sentences.length}
             </div>
             <div className="progress-bar">
               <span
@@ -302,37 +304,38 @@ export default function PlayScreen({
           </div>
         </div>
 
-        <div className="spacer" />
-
-        <div className="sentence-vi">{sentence.vi}</div>
+        <div className="practice-prompt">
+          <div className="practice-kicker">Dịch câu này sang tiếng Anh</div>
+          <div className="sentence-vi">{sentence.vi}</div>
+        </div>
         <div className="sentence-audio-actions">
           <button
             className="btn btn-sm"
             disabled={!speechSupported || !voicesReady}
             onClick={() => speakText(sentence.vi, { lang: 'vi-VN' })}
           >
-            🔊 Nghe câu Việt
+            <Volume2 size={15} /> Câu Việt
           </button>
           <button
             className="btn btn-sm"
             disabled={!speechSupported || !voicesReady}
             onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-US' })}
           >
-            🔊 Anh Mỹ
+            <Ear size={15} /> Anh Mỹ
           </button>
           <button
             className="btn btn-sm"
             disabled={!speechSupported || !voicesReady}
             onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-GB' })}
           >
-            🔊 Anh Anh
+            <AudioLines size={15} /> Anh Anh
           </button>
           <button
             className="btn btn-sm"
             disabled={!speechSupported || !voicesReady}
             onClick={() => speakText(smartJoin(sentence.en), { lang: 'en-US', slow: true })}
           >
-            🔊 Nghe chậm
+            <Gauge size={15} /> Nghe chậm
           </button>
         </div>
         {speechSupported && !voicesReady && (
@@ -428,13 +431,13 @@ export default function PlayScreen({
                 disabled={!allFilled}
                 onClick={checkAnswer}
               >
-                Kiểm tra
+                <Check size={17} /> Kiểm tra
               </button>
               <button
                 className="btn"
                 onClick={showAnswer}
               >
-                Xem đáp án
+                <Eye size={17} /> Xem đáp án
               </button>
             </>
           ) : (
