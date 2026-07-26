@@ -751,6 +751,52 @@ button svg {
   border-bottom: 1px solid var(--border);
 }
 
+.paragraph-import {
+  margin-bottom: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid rgba(108, 92, 231, 0.18);
+  border-radius: var(--radius-lg);
+  background: var(--accent-pale);
+}
+
+.paragraph-import-heading {
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.paragraph-import-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent);
+}
+
+.paragraph-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.paragraph-import-input {
+  min-height: 112px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.processed-sentences-heading {
+  margin-top: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(24, 169, 137, 0.18);
+  border-radius: 12px;
+  background: rgba(24, 169, 137, 0.08);
+  color: var(--mint);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
 .form-label {
   display: block;
   margin-bottom: var(--space-2);
@@ -1885,6 +1931,19 @@ button svg {
 
   .sentence-row-grid {
     grid-template-columns: 1fr;
+  }
+
+  .paragraph-import-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .paragraph-import-heading .btn {
+    width: 100%;
+  }
+
+  .paragraph-import-actions {
+    flex-direction: column;
   }
 
   .play-main {

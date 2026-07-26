@@ -2,8 +2,13 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { extractRandomMeetingFiles } from './utils/extractMeetings.js';
 import { getAllTopics, getTopicById, saveTopic, deleteTopic, getTables, runQuery, updateRow, deleteRow, insertRow, getTopicProgress, saveTopicProgress } from './db.js';
+import {
+  MAX_TRANSCRIPT_LENGTH,
+  buildTranscriptPrompt,
+  cleanTranscriptText,
+  parseTranscriptResult
+} from './utils/transcript.js';
 
 dotenv.config();
 
@@ -249,25 +254,30 @@ app.post('/api/generate-from-topic', generateLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/generate-from-meetings', generateLimiter, async (_req, res) => {
-  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-    return res.status(501).json({ error: 'Chức năng này không khả dụng trên production.' });
-  }
-
+app.post('/api/process-transcript', generateLimiter, async (req, res) => {
+  const { transcript } = req.body;
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     return res.status(500).json({ error: 'Server chưa cấu hình API key' });
   }
 
+  if (typeof transcript !== 'string' || !transcript.trim()) {
+    return res.status(400).json({ error: 'Vui lòng dán transcript cần xử lý' });
+  }
+
+  if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
+    return res.status(413).json({
+      error: `Transcript quá dài. Vui lòng chia thành các phần dưới ${MAX_TRANSCRIPT_LENGTH.toLocaleString('vi-VN')} ký tự.`
+    });
+  }
+
+  const cleanedTranscript = cleanTranscriptText(transcript);
+  if (!cleanedTranscript) {
+    return res.status(400).json({ error: 'Transcript không có nội dung có thể xử lý' });
+  }
+
   try {
-    // Random pick 15 files from all meetings so each generation is different
-    const { text, count, files } = await extractRandomMeetingFiles(15);
-
-    if (!text || text.length < 100) {
-      return res.status(400).json({ error: `Không đủ nội dung trong folder meeting (${count} file). Vui lòng thêm file meeting notes.` });
-    }
-
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -278,40 +288,40 @@ app.post('/api/generate-from-meetings', generateLimiter, async (_req, res) => {
       },
       body: JSON.stringify({
         model: 'openai/gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 8000,
+        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
-            content: 'You are a bilingual assistant creating English vocabulary exercises from meeting transcripts. Summarize key discussion points into natural English sentences, then translate them into accurate, natural Vietnamese. Break each English sentence into an array of meaningful tokens. Keep contractions as single tokens (e.g., "don\'t", "I\'m", "can\'t"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit (e.g., "New York", "machine learning"). The Vietnamese translation must convey the correct meaning, not be a literal word-for-word translation.\n\nIMPORTANT: Use first-person perspective (I, we, my, our) instead of third-person (he, she, Tom, they). Do NOT include any specific personal names (e.g., Huy, Nguyên, Tom, Tom Nguyen, John, Mary). If a sentence needs to refer to a person, use "I", "we", or generic references like "my team" or "the team" instead of named individuals.'
+            content: 'You are an expert transcript editor and English-Vietnamese translator. Correct noisy automatic captions conservatively and produce faithful bilingual learning material.'
           },
           {
             role: 'user',
-            content: `From the following meeting transcripts (extracted from ${files.length} different meeting files), create 20 diverse sentences covering different topics discussed. For each sentence:\n1. A natural Vietnamese translation that accurately conveys the meaning\n2. The English sentence broken down into meaningful tokens (in correct order). Keep contractions as single tokens (e.g., "don't", "I'm", "can't"). Keep proper nouns and fixed phrases as single tokens when they represent one semantic unit.\n\nCRITICAL RULES:\n- Use first-person perspective (I, we, my, our) instead of third-person.\n- NEVER include specific personal names like Huy, Nguyên, Tom, Tom Nguyen, John, Mary, etc.\n- If referring to a person, use "I", "we", "my team", or omit the name entirely.\n\nImportant: Each sentence should be from DIFFERENT parts of the meetings, not repetitive. Cover various topics like bugs, features, deadlines, team updates, technical discussions, etc. The Vietnamese translation must be natural, not a literal word-for-word translation.\n\nReturn ONLY a JSON object: {"sentences": [{"vi": "...", "en": ["word1", "word2", ...]}]}.\n\nMeeting transcripts:\n\n${text.substring(0, 50000)}`
+            content: buildTranscriptPrompt(cleanedTranscript)
           }
         ]
       })
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return res.status(502).json({ error: err.error?.message || `OpenRouter error: ${response.status}` });
+      const errorBody = await response.json().catch(() => ({}));
+      return res.status(502).json({
+        error: errorBody.error?.message || `OpenRouter error: ${response.status}`
+      });
     }
 
     const data = await response.json();
-    let content = data.choices[0].message.content;
+    const result = parseTranscriptResult(data.choices?.[0]?.message?.content);
 
-    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) content = jsonMatch[1];
+    if (result.sentences.length === 0) {
+      return res.status(502).json({ error: 'AI không tạo được cặp câu hợp lệ từ transcript' });
+    }
 
-    const parsed = JSON.parse(content);
-    return res.json({
-      sentences: parsed.sentences || parsed.pairs || parsed,
-      sourceCount: count,
-      filesUsed: files,
-      sourcePreview: text.substring(0, 200) + '...'
-    });
+    return res.json(result);
   } catch (err) {
-    console.error('Meeting generation error:', err);
-    return res.status(500).json({ error: err.message || 'Lỗi server' });
+    console.error('Transcript processing error:', err);
+    return res.status(500).json({ error: err.message || 'Lỗi xử lý transcript' });
   }
 });
 

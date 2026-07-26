@@ -75,30 +75,23 @@ export async function generateFromTopic(topicName) {
   }
 }
 
-export async function generateFromMeetings() {
-  // Call backend to generate from meeting data in server/meeting folder
-  try {
-    const response = await fetch('/api/generate-from-meetings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+export async function processTranscriptWithAI(transcript) {
+  const response = await fetch('/api/process-transcript', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ transcript })
+  });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `Server error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      sentences: data.sentences || [],
-      sourceCount: data.sourceCount,
-      sourcePreview: data.sourcePreview,
-      filesUsed: data.filesUsed || []
-    };
-  } catch (err) {
-    console.warn('Meeting generation failed:', err.message);
-    throw err;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Server error: ${response.status}`);
   }
+
+  const data = await response.json();
+  return {
+    title: data.title || '',
+    sentences: Array.isArray(data.sentences) ? data.sentences : []
+  };
 }

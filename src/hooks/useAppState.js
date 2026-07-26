@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getCustomTopics, saveCustomTopic, deleteCustomTopic, getTopic } from '../utils/storage';
-import { generateFromMeetings } from '../utils/ai';
 import {
   fetchTopicProgress,
   persistTopicProgress,
@@ -24,10 +23,8 @@ export function useAppState() {
   const [customTopics, setCustomTopics] = useState([]);
   const [topicProgress, setTopicProgress] = useState({});
   const [progressReady, setProgressReady] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [showAIGenerate, setShowAIGenerate] = useState(false);
   const [showDBViewer, setShowDBViewer] = useState(false);
-  const [meetingLoading, setMeetingLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [routeHandled, setRouteHandled] = useState(false);
   const { toasts, addToast, removeToast } = useToast();
@@ -181,11 +178,6 @@ export function useAppState() {
     setTopicProgress((prev) => clearTopicProgress(prev, id));
   }, []);
 
-  const handleImport = useCallback(async (topic) => {
-    await saveCustomTopic(topic);
-    setCustomTopics((prev) => [...prev, { ...topic, isBuiltIn: false }]);
-  }, []);
-
   const handleAIGenerate = useCallback(async (topic) => {
     await saveCustomTopic(topic);
     setCustomTopics((prev) => [...prev, { ...topic, isBuiltIn: false }]);
@@ -238,44 +230,16 @@ export function useAppState() {
     }
   }, [location.pathname, loading, routeHandled, goTopics, startTopic]);
 
-  const handleGenerateFromMeetings = useCallback(async () => {
-    setMeetingLoading(true);
-    try {
-      const data = await generateFromMeetings();
-      const topic = {
-        id: 'meeting_' + Date.now(),
-        title: 'Meeting Notes',
-        sentences: data.sentences
-      };
-      await saveCustomTopic(topic);
-      setCustomTopics((prev) => [...prev, { ...topic, isBuiltIn: false }]);
-      const filesList =
-        data.filesUsed?.slice(0, 5).join(', ') +
-        (data.filesUsed?.length > 5 ? `... và ${data.filesUsed.length - 5} file khác` : '');
-      addToast(
-        `Đã tạo ${data.sentences.length} câu từ ${data.filesUsed?.length || '?'} file meeting!\nFiles: ${filesList || 'N/A'}`,
-        'success',
-        6000
-      );
-    } catch (err) {
-      addToast('Lỗi: ' + err.message, 'error');
-    } finally {
-      setMeetingLoading(false);
-    }
-  }, [addToast]);
-
   return {
     SCREENS,
     allTopics,
     currentMode,
     currentTopic,
     loading,
-    meetingLoading,
     results,
     screen,
     showAIGenerate,
     showDBViewer,
-    showImport,
     topicProgress,
     toasts,
     addToast,
@@ -284,16 +248,13 @@ export function useAppState() {
     setCurrentMode,
     setShowAIGenerate,
     setShowDBViewer,
-    setShowImport,
     startTopic,
     goTopics,
     handleDeleteTopic,
     handleSaveCustom,
-    handleImport,
     handleAIGenerate,
     handlePlayProgress,
     handleComplete,
-    handleRestart,
-    handleGenerateFromMeetings
+    handleRestart
   };
 }
