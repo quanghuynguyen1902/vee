@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, AudioLines, Check, Ear, Eye, Gauge, Volume2 } from 'lucide-react';
+import { ArrowLeft, AudioLines, Check, Ear, Eye, Gauge, Lightbulb, Volume2 } from 'lucide-react';
 import { smartJoin } from '../utils/text';
 import { buildSpeechSettings, choosePreferredVoice } from '../utils/tts';
 import ChatPanel from './ChatPanel';
@@ -36,8 +36,10 @@ export default function PlayScreen({
   const [feedback, setFeedback] = useState('');
   const [feedbackClass, setFeedbackClass] = useState('');
   const [results, setResults] = useState([]);
+  const [hintedCharCounts, setHintedCharCounts] = useState([]);
   const [voicesReady, setVoicesReady] = useState(false);
   const hasRestoredRef = useRef(false);
+  const activeTypeSlotRef = useRef(0);
   const inputRefs = useRef([]);
 
   const sentence = topic.sentences[currentIndex];
@@ -72,6 +74,7 @@ export default function PlayScreen({
       setUserAnswers(restoredAnswers);
 
       if (mode === 'drag') {
+        setHintedCharCounts([]);
         if (Array.isArray(saved.bankWords) && saved.bankWords.length > 0) {
           setBankWords(saved.bankWords);
         } else {
@@ -80,6 +83,13 @@ export default function PlayScreen({
         }
       } else {
         setBankWords([]);
+        const restoredHintCounts = Array.isArray(saved.hintedCharCounts)
+          ? saved.hintedCharCounts.slice(0, s.en.length).map((count, index) =>
+              Math.min(Math.max(Number(count) || 0, 0), (s.en[index] || '').length)
+            )
+          : new Array(s.en.length).fill(0);
+        while (restoredHintCounts.length < s.en.length) restoredHintCounts.push(0);
+        setHintedCharCounts(restoredHintCounts);
       }
     } else {
       setCurrentIndex(0);
@@ -140,12 +150,15 @@ export default function PlayScreen({
     const s = topic.sentences[idx];
     const empty = new Array(s.en.length).fill('');
     setUserAnswers(empty);
+    activeTypeSlotRef.current = 0;
 
     if (mode === 'drag') {
       const pool = shuffle([...s.en]);
       setBankWords(pool.map((word, i) => ({ word, id: i, used: false })));
+      setHintedCharCounts([]);
     } else {
       setBankWords([]);
+      setHintedCharCounts(new Array(s.en.length).fill(0));
     }
   }
 
@@ -182,6 +195,35 @@ export default function PlayScreen({
     const newAnswers = [...userAnswers];
     newAnswers[slotIdx] = value.trim();
     setUserAnswers(newAnswers);
+  }
+
+  function revealTypeHint() {
+    if (checked || mode !== 'type') return;
+
+    const needsHint = (index) => {
+      const target = sentence.en[index] || '';
+      const answer = userAnswers[index] || '';
+      return answer.toLowerCase() !== target.toLowerCase()
+        && (hintedCharCounts[index] || 0) < target.length;
+    };
+
+    let slotIdx = activeTypeSlotRef.current;
+    if (!needsHint(slotIdx)) {
+      slotIdx = sentence.en.findIndex((_, index) => needsHint(index));
+    }
+    if (slotIdx === -1) return;
+
+    setHintedCharCounts((prev) => {
+      const next = new Array(sentence.en.length).fill(0);
+      prev.forEach((count, index) => {
+        if (index < next.length) next[index] = count;
+      });
+      next[slotIdx] = Math.min((next[slotIdx] || 0) + 1, sentence.en[slotIdx].length);
+      return next;
+    });
+
+    activeTypeSlotRef.current = slotIdx;
+    inputRefs.current[slotIdx]?.focus();
   }
 
   const allFilled = userAnswers.every((a) => a && a !== '');
@@ -275,12 +317,18 @@ export default function PlayScreen({
         feedback,
         feedbackClass,
         userAnswers,
-        bankWords
+        bankWords,
+        hintedCharCounts
       });
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [onProgress, currentIndex, results, checked, feedback, feedbackClass, userAnswers, bankWords]);
+  }, [onProgress, currentIndex, results, checked, feedback, feedbackClass, userAnswers, bankWords, hintedCharCounts]);
+
+  const hasAvailableTypeHint = mode === 'type' && !checked && sentence.en.some((word, index) => (
+    (userAnswers[index] || '').toLowerCase() !== word.toLowerCase()
+      && (hintedCharCounts[index] || 0) < word.length
+  ));
 
   return (
     <section className="screen active play-layout" id="screen-play">
@@ -361,39 +409,52 @@ export default function PlayScreen({
               ))
             : userAnswers.map((ans, i) => {
                 const targetWord = sentence.en[i] || '';
+                const hintedCount = hintedCharCounts[i] || 0;
+                const hintedPrefix = targetWord.slice(0, hintedCount);
                 const statusClass = checked
                   ? ans.toLowerCase() === targetWord.toLowerCase()
                     ? 'correct'
                     : 'wrong'
                   : '';
-                return checked ? (
-                  <div
-                    key={i}
-                    className={`slot-input ${statusClass}`}
-                    style={getTypeSlotStyle(targetWord)}
-                  >
-                    {ans}
+                return (
+                  <div className="type-slot-wrap" key={i}>
+                    {checked ? (
+                      <div
+                        className={`slot-input ${statusClass}`}
+                        style={getTypeSlotStyle(targetWord)}
+                      >
+                        {ans}
+                      </div>
+                    ) : (
+                      <input
+                        ref={(el) => (inputRefs.current[i] = el)}
+                        type="text"
+                        className={`slot-input ${statusClass}`}
+                        value={ans}
+                        style={getTypeSlotStyle(targetWord)}
+                        placeholder={'-'.repeat(targetWord.length)}
+                        aria-label={`Từ thứ ${i + 1}`}
+                        onChange={(e) => onTypeInput(i, e.target.value)}
+                        onFocus={() => {
+                          activeTypeSlotRef.current = i;
+                        }}
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (allFilled) checkAnswer();
+                          }
+                        }}
+                      />
+                    )}
+                    {!checked && hintedCount > 0 && (
+                      <span className="type-slot-clue" aria-live="polite">
+                        {hintedPrefix}{hintedCount < targetWord.length ? '…' : ''}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <input
-                    key={i}
-                    ref={(el) => (inputRefs.current[i] = el)}
-                    type="text"
-                    className={`slot-input ${statusClass}`}
-                    value={ans}
-                    style={getTypeSlotStyle(targetWord)}
-                    placeholder={'-'.repeat(targetWord.length)}
-                    onChange={(e) => onTypeInput(i, e.target.value)}
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (allFilled) checkAnswer();
-                      }
-                    }}
-                  />
                 );
               })}
         </div>
@@ -416,8 +477,21 @@ export default function PlayScreen({
         )}
 
         {mode === 'type' && (
-          <div className="hint" id="type-hint">
-            Nhập từng từ vào ô trống, dùng Tab để chuyển ô.
+          <div className="type-hint-area" id="type-hint">
+            {!checked && (
+              <button
+                className="btn btn-sm type-hint-button"
+                onClick={revealTypeHint}
+                disabled={!hasAvailableTypeHint}
+              >
+                <Lightbulb size={15} /> Gợi ý
+              </button>
+            )}
+            <div className="hint">
+              {checked
+                ? 'Bạn có thể nghe lại câu để ghi nhớ cách phát âm.'
+                : 'Chọn một ô rồi bấm Gợi ý để mở dần từng chữ cái. Dùng Tab để chuyển ô.'}
+            </div>
           </div>
         )}
 
